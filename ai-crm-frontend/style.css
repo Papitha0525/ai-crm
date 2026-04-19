@@ -1,0 +1,98 @@
+:root {
+    --primary: #ff8c00;
+    --primary-grad: linear-gradient(135deg, #ff8c00, #ffb347);
+    --bg-dark: #0b0e14;
+    --sidebar-dark: #12151c;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; transition: 0.2s ease; }
+body.dark { background-color: var(--bg-dark); color: white; }
+body.light { background-color: #f4f7f6; color: #1a1a1a; }
+
+.layout { display: flex; height: 100vh; overflow: hidden; }
+
+/* ✅ FIXED SIDEBAR */
+.sidebar {
+    width: 260px;
+    background: var(--sidebar-dark);
+    padding: 30px 15px 0 15px; /* removed bottom padding — handled by sidebar-bottom */
+    display: flex;
+    flex-direction: column;
+    height: 100vh;             /* full viewport height */
+    overflow: hidden;          /* prevent sidebar from scrolling as a whole */
+    border-right: 1px solid rgba(255,255,255,0.05);
+    flex-shrink: 0;
+}
+body.light .sidebar { background: #fff; border-right: 1px solid #ddd; }
+
+/* ✅ TOP SECTION — scrolls internally if history grows */
+.sidebar-top {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* important for flex scroll to work */
+}
+
+/* ✅ BOTTOM BUTTONS — always pinned to bottom */
+.sidebar-bottom {
+    position: sticky;
+    bottom: 0;
+    background: var(--sidebar-dark);
+    border-top: 1px solid rgba(255,255,255,0.05);
+    padding: 15px 0;
+    z-index: 10;
+    flex-shrink: 0;
+}
+body.light .sidebar-bottom { background: #fff; border-top: 1px solid #ddd; }
+
+.logo-area { display: flex; align-items: center; gap: 10px; margin-bottom: 30px; }
+.logo-3d { font-size: 22px; background: rgba(255,140,0,0.1); padding: 8px; border-radius: 10px; }
+.logo-area h2 { font-size: 18px; }
+.logo-area h2 span { color: var(--primary); }
+
+.theme-mini-btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #888; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; margin-left: auto; }
+.history-section { flex: 1; overflow-y: auto; margin-top: 10px; }
+.section-label { font-size: 10px; font-weight: 700; color: #555; letter-spacing: 1px; margin-bottom: 15px; }
+.history-item { padding: 10px; border-radius: 8px; font-size: 13px; color: #888; cursor: pointer; margin-bottom: 5px; }
+.history-item:hover { background: rgba(255,255,255,0.03); color: white; }
+
+.util-btn { width: 100%; padding: 12px; border: none; background: transparent; color: #aaa; text-align: left; cursor: pointer; font-size: 14px; display: flex; align-items: center; }
+.util-btn i { margin-right: 10px; color: var(--primary); }
+.util-btn:hover { background: rgba(255,140,0,0.1); color: var(--primary); border-radius: 10px; }
+
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+#chat-box { flex: 1; overflow-y: auto; padding: 40px; display: flex; flex-direction: column; gap: 20px; }
+
+.input-container { padding: 20px 40px 40px 40px; flex-shrink: 0; }
+.input-area { max-width: 800px; margin: 0 auto; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 8px 15px; border-radius: 20px; display: flex; align-items: center; }
+body.light .input-area { background: #fff; border: 1px solid #ddd; }
+
+input { flex: 1; background: transparent; border: none; outline: none; padding: 10px; color: inherit; caret-color: var(--primary); }
+
+/* --- VOICE ANIMATION --- */
+.listening {
+    color: var(--primary) !important;
+    animation: pulse-voice 1.5s infinite;
+}
+@keyframes pulse-voice {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.icon-btn, .send-btn { width: 44px; height: 44px; border-radius: 12px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; background: transparent; color: #888; }
+.send-btn { background: var(--primary-grad); color: white; margin-left: 10px; }
+
+.user { align-self: flex-end; background: var(--primary-grad); padding: 12px 18px; border-radius: 18px 18px 0 18px; color: white; }
+.bot { align-self: flex-start; background: #1e2128; padding: 12px 18px; border-radius: 18px 18px 18px 0; color: #eee; }
+body.light .bot { background: white; border: 1px solid #eee; color: #333; }
+
+.friendly-card { padding: 20px; border-radius: 15px; text-align: center; max-width: 380px; margin: 10px 0; border: 1px solid rgba(255,140,0,0.2); background: rgba(255,140,0,0.05); }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: none; align-items: center; justify-content: center; z-index: 2000; }
+.modal-card { background: var(--sidebar-dark); padding: 30px; border-radius: 20px; text-align: center; }
+body.light .modal-card { background: white; }
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+.modal-actions button { flex: 1; padding: 12px; border-radius: 10px; cursor: pointer; border: none; font-weight: 700; }
+.btn-confirm { background: #ff4757; color: white; }
+.btn-cancel { background: rgba(255,255,255,0.1); color: #888; }
