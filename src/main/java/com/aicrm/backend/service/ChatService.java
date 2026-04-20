@@ -239,7 +239,7 @@ else if (msg.contains("update") &&
                 if (!missing.isBlank()) {
 
                     response = new ChatResponse(
-                            "Required fields missing:\n\n" + missing,
+                            "Missing data:\n\n" + missing,
                             "REQUIRED_FIELDS",
                             null
                     );
@@ -256,7 +256,10 @@ else if (msg.contains("update") &&
 
                     } else {
 
+                        if (isBlank(pendingLead.getRequirement())) {
                         pendingLead.setRequirement("General");
+                            }
+
                         pendingLead.setSource("CHAT");
 
                         Lead lead = leadService.createLead(pendingLead);
@@ -328,6 +331,7 @@ else if (msg.contains("update") &&
     pendingLead.setName(extractName(originalMsg));
     pendingLead.setPhone(extractPhone(originalMsg));
     pendingLead.setEmail(extractEmail(originalMsg));
+    pendingLead.setRequirement(extractRequirement(originalMsg));
 
     // ✅ City extract பண்ணு
     String city = extractCity(originalMsg);
@@ -339,7 +343,7 @@ else if (msg.contains("update") &&
     if (!missing.isBlank()) {
         waitingLeadInput = true;
         response = new ChatResponse(
-            "Please provide missing details:\n\n"
+            "Missing data:\n\n"
             + missing,
             "REQUIRED_FIELDS", null);
     } else if (pendingLead.getPhone() != null &&
@@ -361,7 +365,7 @@ else if (msg.contains("update") &&
             // =====================================
             // DELETE LEAD
             // =====================================
-            else if (msg.startsWith("delete")) {
+            else if (msg.startsWith("delete") || msg.endsWith("delete")) { {
 
                 String name = extractDeleteName(originalMsg);
 
@@ -417,7 +421,7 @@ else if (msg.contains("update") &&
                             null
                     );
                 }
-            }
+            }}
 
             // =====================================
             // UPDATE PHONE
@@ -542,6 +546,9 @@ else if (msg.contains("follow up") ||
               .append("🏙 City     : ").append(
                 lead.getCity() != null
                 ? lead.getCity() : "-").append("\n")
+                .append("📝 Requirement : ").append(
+                lead.getRequirement() != null
+                ? lead.getRequirement() : "-").append("\n")
               .append("📌 Source   : ").append(
                 lead.getSource() != null
                 ? lead.getSource() : "-").append("\n")
@@ -563,6 +570,57 @@ else if (msg.contains("follow up") ||
         sb.append("━━━━━━━━━━━━━━━━━━━━");
         response = new ChatResponse(
             sb.toString(), "SHOW_LEADS", leads);
+    }
+}
+else if (msg.contains("needs")) {
+
+    String name = "";
+    String city = "";
+    String requirement = "";
+
+    Pattern p = Pattern.compile(
+        "(\\w+)\\s+needs\\s+(.+)\\s+in\\s+([A-Za-z ]+)",
+        Pattern.CASE_INSENSITIVE
+    );
+
+    Matcher m = p.matcher(originalMsg);
+
+    if (m.find()) {
+
+        name = m.group(1).trim();
+        requirement = m.group(2).trim();
+        city = m.group(3).trim();
+
+        LeadDto dto = new LeadDto();
+
+dto.setName(name);
+dto.setPhone("0000000000");
+dto.setEmail(name.toLowerCase() + "@gmail.com");
+dto.setCity(city);
+dto.setRequirement(requirement);
+dto.setSource("CHAT");
+dto.setStatus("NEW");
+dto.setDealStatus("PENDING");
+dto.setFollowUp("None");
+
+leadService.createLead(dto);
+
+        response = new ChatResponse(
+            "✅ Lead created successfully.\n\n" +
+            "👤 Name : " + name + "\n" +
+            "🏙 City : " + city + "\n" +
+            "📄 Requirement : " + requirement,
+            "LEAD_CREATED",
+            null
+        );
+
+    } else {
+
+        response = new ChatResponse(
+            "Use format:\nRavi needs elevator in Chennai",
+            "INVALID",
+            null
+        );
     }
 }
 
@@ -613,74 +671,54 @@ else if (msg.contains("follow up") ||
     // CREATE HELPERS
     // =====================================
 
-    private void fillMissingLeadFields(String text) {
+private void fillMissingLeadFields(String text) {
 
-        if (isBlank(pendingLead.getName())) {
+    if (isBlank(pendingLead.getName())) {
+        pendingLead.setName(text.trim());
+        return;
+    }
 
-            String name = extractName(text);
-
-            if (!name.isBlank()) {
-                pendingLead.setName(name);
-                return;
-            }
+    if (isBlank(pendingLead.getPhone())) {
+        String phone = extractPhone(text);
+        if (!phone.isBlank()) {
+            pendingLead.setPhone(phone);
+            return;
         }
+    }
 
-        if (isBlank(pendingLead.getPhone())) {
-
-            String phone = extractPhone(text);
-
-            if (!phone.isBlank()) {
-                pendingLead.setPhone(phone);
-                return;
-            }
+    if (isBlank(pendingLead.getEmail())) {
+        String email = extractEmail(text);
+        if (!email.isBlank()) {
+            pendingLead.setEmail(email);
+            return;
         }
+    }
 
-        if (isBlank(pendingLead.getEmail())) {
+    if (isBlank(pendingLead.getCity())) {
+        pendingLead.setCity(text.trim());
+        return;
+    }
 
-            String email = extractEmail(text);
-
-            if (!email.isBlank()) {
-                pendingLead.setEmail(email);
-            }
-        }
-
-        if (isBlank(pendingLead.getCity())) {
-    String city = extractCity(text);
-    if (!city.isBlank()) {
-        pendingLead.setCity(city);
-    } else {
-        // City keyword இல்லன்னா direct-ஆ set பண்ணு
-        // Example: user "Chennai" மட்டும் type பண்ணினா
-        String trimmed = text.trim();
-        if (trimmed.matches("[a-zA-Z]+")) {
-            pendingLead.setCity(trimmed);
-        }
+    if (isBlank(pendingLead.getRequirement())) {
+        pendingLead.setRequirement(text.trim());
     }
 }
-    }
 
-  private String getMissingFields() {
+ private String getMissingFields() {
 
     StringBuilder missing = new StringBuilder();
 
     if (isBlank(pendingLead.getName()))
-        missing.append("• Please provide Name\n");
+        missing.append("• Name\n");
 
     if (isBlank(pendingLead.getPhone()))
-        missing.append("• Please provide Phone (10 digits)\n");
+        missing.append("• Phone\n");
 
-    if (isBlank(pendingLead.getEmail())) {
-        missing.append("• Please provide Email " +
-                       "(example@gmail.com)\n");
-    } else if (!isValidEmail(pendingLead.getEmail())) {
-        missing.append("• Invalid Email! " +
-                       "Use: example@gmail.com\n");
-        pendingLead.setEmail("");
-    }
+    if (isBlank(pendingLead.getEmail()))
+        missing.append("• Email\n");
 
-    // ✅ இதை add பண்ணு
-    if (isBlank(pendingLead.getCity()))
-        missing.append("• Please provide City\n");
+    if (isBlank(pendingLead.getRequirement()))
+        missing.append("• Requirement\n");
 
     return missing.toString().trim();
 }
@@ -722,15 +760,43 @@ else if (msg.contains("follow up") ||
 
     private String extractName(String text) {
 
-        Pattern p = Pattern.compile(
-                "name\\s+(.+?)(?=\\s+phone|\\s+number|\\s+email|\\s+city|$)",
-                Pattern.CASE_INSENSITIVE
-        );
+    if (text == null || text.trim().isEmpty())
+        return "";
 
-        Matcher m = p.matcher(text);
+    Pattern p1 = Pattern.compile(
+        "(?i)(?:create\\s+a?\\s*lead\\s+for|lead\\s+for|for)\\s+([A-Za-z]+)"
+    );
 
-        return m.find() ? m.group(1).trim() : "";
-    }
+    Matcher m1 = p1.matcher(text);
+
+    if (m1.find())
+        return m1.group(1).trim();
+
+    Pattern p2 = Pattern.compile("(?i)name\\s+([A-Za-z]+)");
+
+    Matcher m2 = p2.matcher(text);
+
+    if (m2.find())
+        return m2.group(1).trim();
+
+    return "";
+}
+private String extractRequirement(String text) {
+
+    if (text == null || text.trim().isEmpty())
+        return "";
+
+    Pattern p = Pattern.compile(
+        "(?i)(looking for|need|requires)\\s+(.+?)(?:\\s+in\\s+[A-Za-z]+|$)"
+    );
+
+    Matcher m = p.matcher(text);
+
+    if (m.find())
+        return m.group(2).trim();
+
+    return "";
+}
 
     private String extractPhone(String text) {
 
@@ -786,8 +852,19 @@ else if (msg.contains("follow up") ||
     }
 
     private String extractDeleteName(String text) {
-        return text.replaceFirst("(?i)delete", "").trim();
+
+    text = text.trim();
+
+    if (text.toLowerCase().startsWith("delete")) {
+        return text.substring(6).trim();
     }
+
+    if (text.toLowerCase().endsWith("delete")) {
+        return text.substring(0, text.length() - 6).trim();
+    }
+
+    return text.replaceAll("(?i)delete", "").trim();
+}
 
     private String extractUpdateName(String text) {
 
