@@ -29,35 +29,36 @@ public class AiOrchestratorService {
 
         String input = userMessage.trim();
 
-        // CRM only filter
         if (!isCrmRelated(input)) {
-            return "Please ask CRM-related questions only.";
+            return "Sorry, I can only answer CRM-related questions. / மன்னிக்கவும், CRM தொடர்பான கேள்விகள் மட்டுமே பதில் சொல்வேன்.";
         }
 
         try {
 
             String systemPrompt = """
 You are AI CRM Pro Assistant.
+You understand English, Tamil, and Tanglish (Tamil written in English letters like 'leads evlo iruku', 'customer sollu', 'deal paru').
+Always reply in the SAME language the user used.
+If user writes in Tanglish, reply in Tanglish.
+If user writes in Tamil, reply in Tamil.
+If user writes in English, reply in English.
 
 Rules:
 1. Reply only for CRM topics.
-2. CRM means leads, sales, follow-up, customer support, pipeline, conversion, retention.
-3. Give professional business replies.
+2. CRM means leads, sales, follow-up, customer support, pipeline, deals, contacts, tasks, conversion, retention.
+3. Give professional but friendly replies.
 4. Maximum 3 short paragraphs.
 5. Each paragraph maximum 2 lines.
 6. No unnecessary long content.
 7. No markdown symbols.
 8. No emojis.
-9. Clear corporate tone.
-10. If outside CRM topic say:
-Please ask CRM-related questions only.
+9. If outside CRM topic say: Sorry, I can only answer CRM-related questions.
 """;
 
             Map<String, Object> body = new HashMap<>();
-
             body.put("model", model);
-            body.put("temperature", 0.2);
-            body.put("max_tokens", 120);
+            body.put("temperature", 0.3);
+            body.put("max_tokens", 200);
 
             List<Map<String, String>> messages = new ArrayList<>();
 
@@ -78,22 +79,21 @@ Please ask CRM-related questions only.
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setBearerAuth(apiKey);
 
-            HttpEntity<Map<String, Object>> entity =
-                    new HttpEntity<>(body, headers);
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
-            ResponseEntity<Map> response = restTemplate.exchange(
+            @SuppressWarnings("unchecked")
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                     apiUrl,
                     HttpMethod.POST,
                     entity,
-                    Map.class
+                    (Class<Map<String, Object>>) (Class<?>) Map.class
             );
 
             String reply = extractReply(response.getBody());
-
             return cleanReply(reply);
 
         } catch (Exception e) {
-            return "AI service is temporarily unavailable.";
+            return "AI service is temporarily unavailable. Please try again.";
         }
     }
 
@@ -102,24 +102,16 @@ Please ask CRM-related questions only.
         String q = text.toLowerCase();
 
         String[] crmWords = {
-                "crm",
-                "customer",
-                "lead",
-                "sales",
-                "pipeline",
-                "follow up",
-                "followup",
-                "prospect",
-                "client",
-                "deal",
-                "conversion",
-                "retention",
-                "marketing",
-                "support",
-                "ticket",
-                "contact",
-                "opportunity",
-                "revenue"
+            "crm", "customer", "lead", "leads", "sales", "pipeline",
+            "follow up", "followup", "prospect", "client", "deal", "deals",
+            "conversion", "retention", "marketing", "support", "ticket",
+            "contact", "contacts", "opportunity", "revenue", "task", "tasks",
+            "report", "forecast", "account", "invoice",
+            "evlo", "iruku", "sollu", "paru", "panni",
+            "epdi", "yaaru", "enna", "pudhu", "paathu",
+            "follow", "status", "update", "create", "add",
+            "delete", "list", "show", "get", "give",
+            "vaaippu", "thodarbu", "varuvai", "velai"
         };
 
         for (String word : crmWords) {
@@ -131,7 +123,7 @@ Please ask CRM-related questions only.
         return false;
     }
 
-    private String extractReply(Map responseBody) {
+    private String extractReply(Map<String, Object> responseBody) {
 
         if (responseBody == null) {
             return "No response received.";
@@ -167,12 +159,10 @@ Please ask CRM-related questions only.
         }
 
         String result = text;
-
         result = result.replace("*", "");
         result = result.replace("#", "");
         result = result.replace("•", "");
         result = result.trim();
-
         result = result.replace(". ", ".\n\n");
 
         while (result.contains("\n\n\n")) {

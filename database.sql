@@ -1,42 +1,62 @@
--- Create Database
-CREATE DATABASE IF NOT EXISTS crm;
-USE crm;
-
--- =========================
--- LEADS TABLE
--- =========================
-CREATE TABLE leads (
- id INT AUTO_INCREMENT PRIMARY KEY,
- name VARCHAR(100) NOT NULL,
- phone VARCHAR(15),
- email VARCHAR(100),
- city VARCHAR(50),
- requirement TEXT,
- status VARCHAR(50) DEFAULT 'NEW', -- NEW, CONTACTED, WON, LOST
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS users (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- =========================
--- TASKS (FOLLOW UPS)
--- =========================
-CREATE TABLE tasks (
- id INT AUTO_INCREMENT PRIMARY KEY,
- lead_id INT,
- task_description TEXT,
- due_date DATE,
- status VARCHAR(50) DEFAULT 'PENDING', -- PENDING, COMPLETED
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
- 
- FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE
+CREATE TABLE IF NOT EXISTS leads (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    phone VARCHAR(20),
+    email VARCHAR(100),
+    city VARCHAR(50),
+    source VARCHAR(50),
+    status VARCHAR(50) DEFAULT 'NEW',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- =========================
--- CHAT HISTORY (AI MEMORY )
--- =========================
-CREATE TABLE chat_messages (
- id INT AUTO_INCREMENT PRIMARY KEY,
- session_id VARCHAR(100),
- role VARCHAR(20), -- user / assistant
- message TEXT,
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS contacts (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    phone VARCHAR(20),
+    email VARCHAR(100),
+    company VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS deals (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(100) NOT NULL,
+    value DOUBLE,
+    stage VARCHAR(50) DEFAULT 'OPEN',
+    close_date DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tasks (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(100) NOT NULL,
+    due_date DATE,
+    status VARCHAR(50) DEFAULT 'PENDING',
+    related_to VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS chat_history (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT,
+    session_id VARCHAR(100),
+    message TEXT,
+    response TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS ai_logs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    request_payload TEXT,
+    response_payload TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
