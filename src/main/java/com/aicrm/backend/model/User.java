@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -25,12 +26,18 @@ public class User {
     @Column(nullable = false)
     private String password;
 
-    private String role; // ADMIN, SALES_REP
+    // ADMIN / SALESMAN / USER
+    @Column(nullable = false)
+    private String role = "USER";
 
     private LocalDateTime createdAt;
 
     @PrePersist
-    void onCreate() {
+    public void onCreate() {
         createdAt = LocalDateTime.now();
+
+        if (role == null || role.isBlank()) {
+            role = "USER";
+        }
     }
 }
