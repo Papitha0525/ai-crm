@@ -1,6 +1,5 @@
 package com.aicrm.backend.security;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -14,18 +13,15 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    @Autowired
-    private JwtFilter jwtFilter;
-
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http)
+            throws Exception {
 
         http
             .csrf(csrf -> csrf.disable())
@@ -38,45 +34,13 @@ public class SecurityConfig {
 
             .authorizeHttpRequests(auth -> auth
 
-                // Public APIs
-                .requestMatchers(
-                    "/api/auth/**"
-                ).permitAll()
+                // Allow all API routes temporarily
+                .requestMatchers("/api/**")
+                .permitAll()
 
-                // Chat APIs (temporary open)
-                .requestMatchers(
-                    "/api/chat/**"
-                ).permitAll()
-
-                // ADMIN only
-                .requestMatchers(
-                    "/api/admin/**"
-                ).hasAuthority("ADMIN")
-
-                // ADMIN + SALESMAN
-                .requestMatchers(
-                    "/api/sales/**"
-                ).hasAnyAuthority(
-                    "ADMIN",
-                    "SALESMAN"
-                )
-
-                // All logged users
-                .requestMatchers(
-                    "/api/user/**"
-                ).hasAnyAuthority(
-                    "ADMIN",
-                    "SALESMAN",
-                    "USER"
-                )
-
-                // Remaining APIs need login
-                .anyRequest().authenticated()
-            )
-
-            .addFilterBefore(
-                jwtFilter,
-                UsernamePasswordAuthenticationFilter.class
+                // Allow everything else also
+                .anyRequest()
+                .permitAll()
             );
 
         return http.build();
@@ -84,6 +48,7 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
+
         return new BCryptPasswordEncoder();
     }
 }

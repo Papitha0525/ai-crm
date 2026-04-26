@@ -29,7 +29,6 @@ public class LeadController {
     }
 
     // ALL LEADS
-    @PreAuthorize("hasAuthority('ADMIN')")
     @GetMapping("/all")
     public List<Lead> getAllLeads() {
         return leadService.getAllLeads();

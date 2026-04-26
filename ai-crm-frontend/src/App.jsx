@@ -240,7 +240,7 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
     setMessages(prev => [...prev, { id: thinkingId, text: "⏳ Processing securely...", type: "bot" }]);
 
     try {
-      const res = await api.post("/chat/message", { message: msg, userId: "1", sessionId: "session1", role: userRole });
+      const res = await api.post("/chat/message", { message: msg, userId: localStorage.getItem("role") || "USER", sessionId: "session1", role: userRole });
       setMessages(prev => prev.filter(m => m.id !== thinkingId));
       addBotMessage(res.data.reply);
     } catch (error) {
@@ -253,8 +253,8 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
     addBotMessage("🔄 Fetching authorized records...");
     setIsMobileMenuOpen(false); // Close mobile menu after clicking
     try {
-      let endpoint = "/leads/my"; 
-      if (isAdmin) endpoint = "/leads/all";
+      let endpoint = "/api/leads/my"; 
+      if (isAdmin) endpoint = "/api/leads/all";
       const res = await api.get(`${endpoint}?role=${userRole}`);
       const leads = res.data;
       if (!leads || leads.length === 0) { addBotMessage("📭 No records found in your access level."); return; }
