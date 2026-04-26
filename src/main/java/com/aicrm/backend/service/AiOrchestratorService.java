@@ -10,11 +10,11 @@ import java.util.*;
 @Service
 public class AiOrchestratorService {
 
-    @Value("${groq.api.url}")
-    private String apiUrl;
-
     @Value("${groq.api.key}")
     private String apiKey;
+
+    @Value("${groq.api.url}")
+    private String apiUrl;
 
     @Value("${groq.model}")
     private String model;
@@ -23,44 +23,30 @@ public class AiOrchestratorService {
 
     public String askGroq(String userMessage) {
 
+        // DEBUG
+        System.out.println("=== GROQ DEBUG ===");
+        System.out.println("KEY: [" + apiKey + "]");
+        System.out.println("URL: [" + apiUrl + "]");
+        System.out.println("MODEL: [" + model + "]");
+        System.out.println("MSG: [" + userMessage + "]");
+        System.out.println("==================");
+
         if (userMessage == null || userMessage.trim().isEmpty()) {
-            return "Please enter a valid CRM question.";
-        }
-
-        String input = userMessage.trim();
-
-        if (!isCrmRelated(input)) {
-            return "மன்னிக்கவும், CRM தொடர்பான கேள்விகள் மட்டுமே பதில் சொல்வேன். / Sorry, I can only answer CRM-related questions.";
+            return "Please enter a valid question.";
         }
 
         try {
-
             String systemPrompt = """
 You are AI CRM Pro Assistant.
-You understand both English and Tamil languages.
-Always reply in the SAME language the user used.
-If user writes in Tamil, reply in natural conversational Tamil (like how people speak in daily life, not formal Tamil).
-If user writes in English, reply in English.
-
-Examples of natural Tamil replies:
-- "உங்க leads எல்லாம் நல்லா progress ஆகுது"
-- "இந்த deal close ஆகும் மாதிரி தெரியுது"
-- "customer கிட்ட follow up பண்ணுங்க"
-
-Rules:
-1. Reply only for CRM topics.
-2. CRM means leads, sales, follow-up, customer support, pipeline, deals, contacts, tasks, conversion, retention.
-3. Give friendly and natural replies.
-4. Maximum 3 short paragraphs.
-5. Each paragraph maximum 2 lines.
-6. No markdown symbols.
-7. No emojis.
-8. If outside CRM topic say in the user's language: Sorry, I can only answer CRM-related questions.
+Answer all CRM related questions professionally.
+CRM means leads, sales, follow-up, customer, pipeline, deals.
+Give clear short answers. Maximum 3 paragraphs.
+No markdown symbols. No emojis. Plain text only.
 """;
 
             Map<String, Object> body = new HashMap<>();
             body.put("model", model);
-            body.put("temperature", 0.4);
+            body.put("temperature", 0.3);
             body.put("max_tokens", 200);
 
             List<Map<String, String>> messages = new ArrayList<>();
@@ -71,7 +57,7 @@ Rules:
 
             Map<String, String> user = new HashMap<>();
             user.put("role", "user");
-            user.put("content", input);
+            user.put("content", userMessage.trim());
 
             messages.add(system);
             messages.add(user);
@@ -82,79 +68,50 @@ Rules:
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setBearerAuth(apiKey);
 
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+            HttpEntity<Map<String, Object>> entity =
+                    new HttpEntity<>(body, headers);
 
-            @SuppressWarnings("unchecked")
-            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+            System.out.println("Calling Groq API...");
+
+            ResponseEntity<Map> response = restTemplate.exchange(
                     apiUrl,
                     HttpMethod.POST,
                     entity,
-                    (Class<Map<String, Object>>) (Class<?>) Map.class
+                    Map.class
             );
+
+            System.out.println("Response status: " + response.getStatusCode());
 
             String reply = extractReply(response.getBody());
             return cleanReply(reply);
 
         } catch (Exception e) {
-            return "AI service is temporarily unavailable. Please try again.";
+            System.out.println("=== GROQ ERROR ===");
+            System.out.println("Error: " + e.getMessage());
+            System.out.println("==================");
+            e.printStackTrace();
+            return "AI Error: " + e.getMessage();
         }
     }
 
-    private boolean isCrmRelated(String text) {
+    private String extractReply(Map responseBody) {
 
-        String q = text.toLowerCase();
-
-        String[] crmWords = {
-            // English
-            "crm", "customer", "lead", "leads", "sales", "pipeline",
-            "follow up", "followup", "prospect", "client", "deal", "deals",
-            "conversion", "retention", "marketing", "support", "ticket",
-            "contact", "contacts", "opportunity", "revenue", "task", "tasks",
-            "report", "forecast", "account",
-
-            // Tamil
-            "வாடிக்கையாளர்", "விற்பனை", "வாய்ப்பு", "தொடர்பு",
-            "வருவாய்", "சந்திப்பு", "அறிக்கை", "பணி",
-            "லீட்", "டீல்", "கஸ்டமர்", "சேல்ஸ்",
-            "லீட்ஸ்", "டாஸ்க்", "ரிப்போர்ட்",
-
-            // Common words
-            "status", "update", "create", "add",
-            "delete", "list", "show", "get"
-        };
-
-        for (String word : crmWords) {
-            if (q.contains(word)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private String extractReply(Map<String, Object> responseBody) {
-
-        if (responseBody == null) {
-            return "No response received.";
-        }
+        if (responseBody == null) return "No response received.";
 
         Object choicesObj = responseBody.get("choices");
 
-        if (!(choicesObj instanceof List<?> choices) || choices.isEmpty()) {
+        if (!(choicesObj instanceof List<?> choices) || choices.isEmpty())
             return "No response received.";
-        }
 
         Object first = choices.get(0);
 
-        if (!(first instanceof Map<?, ?> firstChoice)) {
+        if (!(first instanceof Map<?, ?> firstChoice))
             return "No response received.";
-        }
 
         Object msgObj = firstChoice.get("message");
 
-        if (!(msgObj instanceof Map<?, ?> messageMap)) {
+        if (!(msgObj instanceof Map<?, ?> messageMap))
             return "No response received.";
-        }
 
         Object content = messageMap.get("content");
 
@@ -163,16 +120,13 @@ Rules:
 
     private String cleanReply(String text) {
 
-        if (text == null || text.isBlank()) {
-            return "No response received.";
-        }
+        if (text == null || text.isBlank()) return "No response received.";
 
         String result = text;
+        result = result.replace("**", "");
         result = result.replace("*", "");
         result = result.replace("#", "");
-        result = result.replace("•", "");
-        result = result.trim();
-        result = result.replace(". ", ".\n\n");
+        result = result.replace("•", "-");
 
         while (result.contains("\n\n\n")) {
             result = result.replace("\n\n\n", "\n\n");
