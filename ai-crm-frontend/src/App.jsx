@@ -52,10 +52,7 @@ function Login({ setAuth, setUserRole, isDarkMode, setIsDarkMode }) {
   const handleSignup = (e) => {
     e.preventDefault();
     if (password !== confirmPassword) { toast.error("Passwords do not match!"); return; }
-    
-    // Set flag for Button Highlight Tutorial
     localStorage.setItem("isNewUser", "true"); 
-    
     toast.success(`Premium Account created for ${username}!`);
     setView("login");
   };
@@ -113,16 +110,18 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
   const [chatSessions, setChatSessions] = useState(() => JSON.parse(localStorage.getItem("chatSessions") || "[]"));
+  
+  // --- CHATGPT STYLE SESSION LOGIC ---
+  const [currentSessionId, setCurrentSessionId] = useState(Date.now()); 
+  
   const [showModal, setShowModal] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
 
-  // --- INTERACTIVE TOUR STATES ---
   const [isTourActive, setIsTourActive] = useState(localStorage.getItem("isNewUser") === "true");
   const [tourStep, setTourStep] = useState(0);
 
-  // Note: Updated step 3 to target system controls as per architecture instructions
   const tourData = [
     { targetId: "step1-newchat", title: "Start Fresh", desc: "Click this (+) button anytime to clear the screen and start a brand new conversation.", style: (isMob) => ({ top: '150px', left: isMob ? '10%' : '300px' }) },
     { targetId: "step2-input", title: "Command Center", desc: "Type commands here (like 'Assign lead') or use the Mic icon for fast voice inputs.", style: (isMob) => ({ bottom: '130px', left: isMob ? '5%' : '50%', transform: isMob ? 'none' : 'translateX(-50%)' }) },
@@ -134,7 +133,6 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
   const isSalesman = userRole === "salesman";
   const isCustomer = userRole === "customer";
 
-  // --- PERFECT ROUNDED IMAGE TOAST WITH TOP PROGRESS BAR ---
   const triggerImageToast = (message) => {
     toast.custom((t) => (
       <div className="premium-toast">
@@ -173,24 +171,51 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
   const addMessage = (text, type) => setMessages(prev => [...prev, { id: Date.now() + Math.random(), text, type }]);
   const addBotMessage = (text) => addMessage(text.replace(/\n/g, "<br>"), "bot");
 
+  // --- FIXED: SAVES ONLY THE FIRST PROMPT AS HISTORY TITLE ---
   const saveToHistory = (userMsg) => {
-    const session = { id: Date.now(), title: userMsg.substring(0, 30) + "...", time: new Date().toLocaleTimeString() };
-    const updatedSessions = [session, ...chatSessions].slice(0, 10);
-    setChatSessions(updatedSessions);
-    localStorage.setItem("chatSessions", JSON.stringify(updatedSessions));
+    const sessionExists = chatSessions.some(session => session.id === currentSessionId);
+    
+    if (!sessionExists) {
+        const titleText = userMsg.length > 25 ? userMsg.substring(0, 25) + "..." : userMsg;
+        const newSession = { id: currentSessionId, title: titleText, time: new Date().toLocaleTimeString() };
+        const updatedSessions = [newSession, ...chatSessions].slice(0, 15);
+        setChatSessions(updatedSessions);
+        localStorage.setItem("chatSessions", JSON.stringify(updatedSessions));
+    }
   };
 
+  // --- FIXED: CREATES NEW SESSION ID WHEN CLICKED ---
   const handleNewChat = () => {
-      showWelcomeMessage(); setInputValue(""); triggerImageToast('Started a fresh conversation');
+      setCurrentSessionId(Date.now()); // Creates fresh session
+      showWelcomeMessage(); 
+      setInputValue(""); 
+      triggerImageToast('Started a fresh conversation');
       if (window.innerWidth <= 768) { setIsMobileMenuOpen(false); }
+  };
+
+  const loadPastChat = (session) => {
+      setCurrentSessionId(session.id); // Re-activates past session
+      triggerImageToast(`Loaded: ${session.title}`);
+      
+      // Shows a visual cue that past chat context is loaded
+      setMessages([{ 
+          id: Date.now(), 
+          text: `📂 <b>Chat Loaded</b><br>Session: ${session.title}<br><br><i>Note: Continue typing to add commands to this session history.</i>`, 
+          type: "bot" 
+      }]);
+      
+      if (window.innerWidth <= 768) setIsMobileMenuOpen(false);
   };
 
   const triggerDeleteHistoryItem = (id, e) => { e.stopPropagation(); setItemToDelete(id); };
 
   const confirmDeleteHistoryItem = () => {
     const updatedSessions = chatSessions.filter(session => session.id !== itemToDelete);
-    setChatSessions(updatedSessions); localStorage.setItem("chatSessions", JSON.stringify(updatedSessions));
-    triggerImageToast('History removed successfully'); setItemToDelete(null); showWelcomeMessage(); 
+    setChatSessions(updatedSessions); 
+    localStorage.setItem("chatSessions", JSON.stringify(updatedSessions));
+    triggerImageToast('History removed successfully'); 
+    setItemToDelete(null); 
+    if (currentSessionId === itemToDelete) { handleNewChat(); }
   };
 
   const handleTourNext = () => {
@@ -206,7 +231,9 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
   const handleSendMessage = async () => {
     const msg = inputValue.trim();
     if (msg === "") return;
-    addMessage(msg, "user"); saveToHistory(msg); setInputValue("");
+    addMessage(msg, "user"); 
+    saveToHistory(msg); // Will only save if this session ID is new!
+    setInputValue("");
 
     const lowerMsg = msg.toLowerCase();
     let pendingAction = null;
@@ -218,7 +245,7 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
     setMessages(prev => [...prev, { id: thinkingId, text: "⏳ Processing securely...", type: "bot" }]);
     
     try {
-      const res = await api.post("/chat/message", { message: msg, userId: "1", sessionId: "session1", role: userRole });
+      const res = await api.post("/chat/message", { message: msg, userId: "1", sessionId: currentSessionId, role: userRole });
       setMessages(prev => prev.filter(m => m.id !== thinkingId)); 
       addBotMessage(res.data.reply);
       if (pendingAction === "assign") triggerImageToast("Lead successfully assigned to pipeline!");
@@ -256,7 +283,6 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
 
   return (
     <div className="layout">
-      {/* --- TOUR OVERLAY --- */}
       {isTourActive && <div className="tour-overlay"></div>}
 
       <div className="mobile-header">
@@ -270,7 +296,7 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
 
       <div className={`sidebar ${isMobileMenuOpen ? 'mobile-open' : ''}`} style={{ zIndex: isTourActive ? 10000 : '' }}>
         <div className="sidebar-top">
-          <div className="logo-area">
+          <div className={`logo-area ${isTourActive && tourStep === 2 ? 'tour-target-glow' : ''}`}>
             <div className="logo-3d">🤖</div><h2>AI <span>CRM</span></h2>
             <div style={{ display: window.innerWidth > 768 ? 'flex' : 'none', marginLeft: 'auto' }}>
                 <button className="theme-mini-btn" onClick={() => setIsDarkMode(!isDarkMode)} style={{ margin: 0 }} title="Toggle Theme"><SunMoon size={16} /></button>
@@ -285,7 +311,6 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
           <div className="history-section">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <p className="section-label" style={{ marginBottom: 0 }}>ACTIVITY LOG</p>
-                {/* --- TOUR TARGET 1: NEW CHAT BUTTON (GLOW ONLY) --- */}
                 <button className={`new-chat-btn ${isTourActive && tourStep === 0 ? 'tour-target-glow' : ''}`} onClick={handleNewChat} title="Start New Chat">
                     <Plus size={15} strokeWidth={2.5} />
                 </button>
@@ -295,7 +320,7 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
               {chatSessions.length === 0 ? (
                 <div className="history-item"><div className="history-content">No recent activity</div></div>
               ) : chatSessions.map(session => (
-                  <div key={session.id} className="history-item" onClick={() => toast.info('Loaded ' + session.title)}>
+                  <div key={session.id} className={`history-item ${currentSessionId === session.id ? 'active-history' : ''}`} onClick={() => loadPastChat(session)}>
                     <div className="history-content"><MessageSquare size={14} /><span>{session.title}</span></div>
                     <button className="delete-history-btn" onClick={(e) => triggerDeleteHistoryItem(session.id, e)} title="Delete item"><X size={14} strokeWidth={2.5} /></button>
                   </div>
@@ -304,7 +329,6 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
           </div>
         </div>
         
-        {/* --- TOUR TARGET 3: SYSTEM UTILITIES --- */}
         <div className={`sidebar-bottom ${isTourActive && tourStep === 2 ? 'tour-target-glow' : ''}`}>
           <button className="util-btn active"><MessageSquare size={16} /> Chat Assistant</button>
           {isAdmin && (
@@ -325,8 +349,7 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
           </AnimatePresence>
         </div>
         <div className="input-container">
-          {/* --- TOUR TARGET 2: INPUT AREA (GLOW ONLY) --- */}
-          <div className={`input-area ${isTourActive && tourStep === 1 ? 'tour-target-glow' : ''}`}>
+          <div className={`input-area ${isTourActive && tourStep === 1 ? 'tour-target' : ''}`}>
             <input value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()} placeholder="Enter command or query..." autoFocus autoComplete="off" />
             <div className="action-buttons" style={{ display: 'flex', gap: '6px' }}>
               <button className={`icon-btn ${isListening ? 'listening' : ''}`} onClick={startVoice} style={isListening ? { background: '#ff4757', color: '#fff' } : {}}><Mic size={18} /></button>
@@ -337,32 +360,21 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
       </div>
 
       <AnimatePresence>
-        {/* --- TOUR TOOLTIP POPUP (ALWAYS ON TOP) --- */}
         {isTourActive && (
             <motion.div 
                 className="tour-tooltip"
                 style={tourData[tourStep].style(window.innerWidth <= 768)}
-                initial={{ opacity: 0, y: 15, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                key={`tour-${tourStep}`}
-                transition={{ duration: 0.3 }}
+                initial={{ opacity: 0, y: 15, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} key={`tour-${tourStep}`} transition={{ duration: 0.3 }}
             >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                     <div style={{ background: 'rgba(255,140,0,0.1)', color: 'var(--primary)', padding: '8px', borderRadius: '10px', display: 'flex' }}>
-                        {tourStep === 0 ? <Plus size={20} /> : tourStep === 1 ? <MessageSquare size={20} /> : <Database size={20} />}
+                        {tourStep === 0 ? <Plus size={20} /> : tourStep === 1 ? <MessageSquare size={20} /> : <Rocket size={20} />}
                     </div>
-                    <h3 style={{ fontSize: '16px', margin: 0, fontFamily: "'Syne', sans-serif", fontWeight: 700 }}>
-                        {tourData[tourStep].title}
-                    </h3>
+                    <h3 style={{ fontSize: '16px', margin: 0, fontFamily: "'Syne', sans-serif", fontWeight: 700 }}>{tourData[tourStep].title}</h3>
                 </div>
-                <p style={{ fontSize: '13.5px', color: 'var(--text-dim)', marginBottom: '20px', lineHeight: '1.5' }}>
-                    {tourData[tourStep].desc}
-                </p>
+                <p style={{ fontSize: '13.5px', color: 'var(--text-dim)', marginBottom: '20px', lineHeight: '1.5' }}>{tourData[tourStep].desc}</p>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold', letterSpacing: '1px' }}>
-                        STEP {tourStep + 1} OF 3
-                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold', letterSpacing: '1px' }}>STEP {tourStep + 1} OF 3</span>
                     <div style={{ display: 'flex', gap: '10px' }}>
                         <button onClick={finishTour} style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Skip</button>
                         <button onClick={handleTourNext} style={{ background: 'var(--primary-grad)', border: 'none', color: 'white', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '13.5px', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(255,140,0,0.3)' }}>
@@ -417,7 +429,6 @@ export default function App() {
 
   return (
     <>
-      {/* ADDED UNSTYLED TO STRIP ALL SONNER DEFAULT CSS */}
       <Toaster position="top-right" theme={isDarkMode ? "dark" : "light"} toastOptions={{ unstyled: true }} />
       <BrowserRouter>
         <Routes>
