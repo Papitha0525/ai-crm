@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   SunMoon, MessageSquare, Eraser, Mic, Send, Trash2, 
   Lock, User, LogOut, Mail, ArrowLeft, ShieldAlert, 
-  Briefcase, HeadphonesIcon, FileText, Eye, EyeOff, Menu, X, Plus, Check
+  Briefcase, HeadphonesIcon, FileText, Eye, EyeOff, Menu, X, Plus, Check,
+  Rocket, Database
 } from 'lucide-react';
 import Particles from "react-tsparticles";
 import { loadSlim } from "tsparticles-slim";
@@ -26,10 +27,7 @@ function Login({ setAuth, setUserRole, isDarkMode, setIsDarkMode }) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const navigate = useNavigate();
-
-  const particlesInit = useCallback(async engine => {
-    await loadSlim(engine);
-  }, []);
+  const particlesInit = useCallback(async engine => { await loadSlim(engine); }, []);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -54,7 +52,10 @@ function Login({ setAuth, setUserRole, isDarkMode, setIsDarkMode }) {
   const handleSignup = (e) => {
     e.preventDefault();
     if (password !== confirmPassword) { toast.error("Passwords do not match!"); return; }
-    localStorage.setItem("showTutorial", "true"); 
+    
+    // Set flag for Button Highlight Tutorial
+    localStorage.setItem("isNewUser", "true"); 
+    
     toast.success(`Premium Account created for ${username}!`);
     setView("login");
   };
@@ -70,12 +71,7 @@ function Login({ setAuth, setUserRole, isDarkMode, setIsDarkMode }) {
   return (
     <div className="login-layout">
       <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 9999 }}>
-        <button 
-          onClick={() => setIsDarkMode(!isDarkMode)}
-          style={{ width: '40px', height: '40px', borderRadius: '50%', background: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)', backdropFilter: 'blur(10px)', border: `1px solid ${isDarkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)'}`, color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', transition: 'all 0.3s ease' }}
-          onMouseOver={(e) => { e.currentTarget.style.background = isDarkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)'; e.currentTarget.style.transform = 'scale(1.05)'; }}
-          onMouseOut={(e) => { e.currentTarget.style.background = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)'; e.currentTarget.style.transform = 'scale(1)'; }}
-        >
+        <button onClick={() => setIsDarkMode(!isDarkMode)} style={{ width: '40px', height: '40px', borderRadius: '50%', background: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)', backdropFilter: 'blur(10px)', border: `1px solid ${isDarkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)'}`, color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', transition: 'all 0.3s ease' }}>
           <SunMoon size={18} />
         </button>
       </div>
@@ -83,9 +79,7 @@ function Login({ setAuth, setUserRole, isDarkMode, setIsDarkMode }) {
       <Particles id="tsparticles" init={particlesInit} options={{ fullScreen: { enable: false, zIndex: 0 }, background: { color: { value: "transparent" } }, fpsLimit: 120, interactivity: { events: { onHover: { enable: true, mode: "repulse" }, resize: true }, modes: { repulse: { distance: 100, duration: 0.4, speed: 1 } } }, particles: { color: { value: ["#ff8c00", "#ffcc00", "#ffffff", "#ff4500"] }, links: { enable: false }, move: { direction: "top", enable: true, outModes: { default: "out" }, random: true, speed: { min: 2, max: 6 }, straight: false }, number: { density: { enable: true, area: 800 }, value: 400 }, opacity: { value: { min: 0.1, max: 1 }, animation: { enable: true, speed: 4, minimumValue: 0 } }, shape: { type: "circle" }, size: { value: { min: 0.5, max: 2.5 }, animation: { enable: true, speed: 3, minimumValue: 0.1 } } }, detectRetina: true }} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 0 }} />
 
       <motion.div className="login-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: "easeOut" }}>
-        <div className="login-header">
-          <div className="logo-3d">🤖</div><h2>AI <span>CRM</span></h2><p>{view === "login" && "Sign in to your account"}{view === "signup" && "Create your premium account"}{view === "forgot" && "Recover your account access"}</p>
-        </div>
+        <div className="login-header"><div className="logo-3d">🤖</div><h2>AI <span>CRM</span></h2></div>
         <AnimatePresence mode="wait">
           {view === "login" && (
             <motion.form key="login" variants={formVariants} initial="hidden" animate="visible" exit="exit" className="login-form" onSubmit={handleLogin}>
@@ -106,13 +100,6 @@ function Login({ setAuth, setUserRole, isDarkMode, setIsDarkMode }) {
               <button type="button" className="forgot-password" onClick={() => setView("login")} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '10px', width: '100%' }}><ArrowLeft size={14} /> Back to Login</button>
             </motion.form>
           )}
-          {view === "forgot" && (
-             <motion.form key="forgot" variants={formVariants} initial="hidden" animate="visible" exit="exit" className="login-form" onSubmit={handleForgotPassword}>
-               <div className="input-group"><Mail size={18} /><input type="email" placeholder="Enter your registered email" value={email} onChange={e => setEmail(e.target.value)} required /></div>
-               <button type="submit" className="btn-login">Send Reset Link</button>
-               <button type="button" className="forgot-password" onClick={() => setView("login")} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '10px', width: '100%' }}><ArrowLeft size={14} /> Back to Login</button>
-             </motion.form>
-          )}
         </AnimatePresence>
       </motion.div>
     </div>
@@ -131,15 +118,27 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
 
+  // --- INTERACTIVE TOUR STATES ---
+  const [isTourActive, setIsTourActive] = useState(localStorage.getItem("isNewUser") === "true");
+  const [tourStep, setTourStep] = useState(0);
+
+  // Note: Updated step 3 to target system controls as per architecture instructions
+  const tourData = [
+    { targetId: "step1-newchat", title: "Start Fresh", desc: "Click this (+) button anytime to clear the screen and start a brand new conversation.", style: (isMob) => ({ top: '150px', left: isMob ? '10%' : '300px' }) },
+    { targetId: "step2-input", title: "Command Center", desc: "Type commands here (like 'Assign lead') or use the Mic icon for fast voice inputs.", style: (isMob) => ({ bottom: '130px', left: isMob ? '5%' : '50%', transform: isMob ? 'none' : 'translateX(-50%)' }) },
+    { targetId: "step3-utils", title: "System Controls", desc: "Use these utilities to fetch leads database, check status, or securely wipe chat memory.", style: (isMob) => ({ bottom: '60px', left: isMob ? '10%' : '300px' }) }
+  ];
+
   const chatBoxRef = useRef(null);
   const isAdmin = userRole === "admin";
   const isSalesman = userRole === "salesman";
   const isCustomer = userRole === "customer";
 
-  // --- EXACT IMAGE TOAST DESIGN FUNCTION ---
+  // --- PERFECT ROUNDED IMAGE TOAST WITH TOP PROGRESS BAR ---
   const triggerImageToast = (message) => {
     toast.custom((t) => (
       <div className="premium-toast">
+        <div className="pt-progress"></div>
         <div className="pt-accent"></div>
         <div className="pt-icon-box"><div className="pt-icon-circle"><Check size={14} strokeWidth={4} /></div></div>
         <div className="pt-content"><h4>Success</h4><p>{message}</p></div>
@@ -158,17 +157,18 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setMessages(prev => {
-        if (prev.length > 0) return prev; 
-        showWelcomeMessage(); 
-        return prev;
-      });
-    }, 500);
+    const timer = setTimeout(() => { setMessages(prev => { if (prev.length > 0) return prev; showWelcomeMessage(); return prev; }); }, 500);
     return () => clearTimeout(timer);
   }, [isAdmin, isSalesman, isCustomer]);
 
   useEffect(() => { if (chatBoxRef.current) chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight; }, [messages]);
+
+  useEffect(() => {
+    if (isTourActive && window.innerWidth <= 768) {
+      if (tourStep === 0 || tourStep === 2) setIsMobileMenuOpen(true);
+      else setIsMobileMenuOpen(false);
+    }
+  }, [isTourActive, tourStep]);
 
   const addMessage = (text, type) => setMessages(prev => [...prev, { id: Date.now() + Math.random(), text, type }]);
   const addBotMessage = (text) => addMessage(text.replace(/\n/g, "<br>"), "bot");
@@ -181,23 +181,26 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
   };
 
   const handleNewChat = () => {
-      showWelcomeMessage();
-      setInputValue("");
-      triggerImageToast('Started a fresh conversation');
+      showWelcomeMessage(); setInputValue(""); triggerImageToast('Started a fresh conversation');
       if (window.innerWidth <= 768) { setIsMobileMenuOpen(false); }
   };
 
-  const triggerDeleteHistoryItem = (id, e) => {
-    e.stopPropagation(); setItemToDelete(id);
-  };
+  const triggerDeleteHistoryItem = (id, e) => { e.stopPropagation(); setItemToDelete(id); };
 
   const confirmDeleteHistoryItem = () => {
     const updatedSessions = chatSessions.filter(session => session.id !== itemToDelete);
-    setChatSessions(updatedSessions);
-    localStorage.setItem("chatSessions", JSON.stringify(updatedSessions));
-    triggerImageToast('History removed successfully');
-    setItemToDelete(null);
-    showWelcomeMessage(); 
+    setChatSessions(updatedSessions); localStorage.setItem("chatSessions", JSON.stringify(updatedSessions));
+    triggerImageToast('History removed successfully'); setItemToDelete(null); showWelcomeMessage(); 
+  };
+
+  const handleTourNext = () => {
+      if (tourStep < tourData.length - 1) setTourStep(prev => prev + 1);
+      else finishTour();
+  };
+  
+  const finishTour = () => {
+      setIsTourActive(false); localStorage.removeItem("isNewUser"); setIsMobileMenuOpen(false);
+      triggerImageToast("You're all set! Let's get started.");
   };
 
   const handleSendMessage = async () => {
@@ -218,12 +221,9 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
       const res = await api.post("/chat/message", { message: msg, userId: "1", sessionId: "session1", role: userRole });
       setMessages(prev => prev.filter(m => m.id !== thinkingId)); 
       addBotMessage(res.data.reply);
-
-      // Using Exact Image Custom Toast After Reply
       if (pendingAction === "assign") triggerImageToast("Lead successfully assigned to pipeline!");
       else if (pendingAction === "delete") triggerImageToast("Lead data cleared from the system!");
       else if (pendingAction === "complete") triggerImageToast("Deal successfully closed! Great job!");
-
     } catch (error) {
       setMessages(prev => prev.filter(m => m.id !== thinkingId)); 
       addBotMessage("❌ Server not responding. Check connection.");
@@ -233,7 +233,6 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
   const fetchDataForRole = () => {
     addBotMessage("🔄 Fetching authorized records..."); setIsMobileMenuOpen(false);
     triggerImageToast("Database records fetched successfully!"); 
-    // MOCK DATA FETCH (Replaced API for stable UI demo)
     setTimeout(() => {
         let html = `📋 <b>Records Found: 1</b><br><br>━━━━━━━━━━━━━━━━━━━━<br>🔢 <b>Record #1</b><br>👤 Name        : Demo User<br>📄 Requirement: Sample Data<br>🔄 Status      : <b>Pending</b><br><br>━━━━━━━━━━━━━━━━━━━━`;
         addBotMessage(html);
@@ -257,6 +256,9 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
 
   return (
     <div className="layout">
+      {/* --- TOUR OVERLAY --- */}
+      {isTourActive && <div className="tour-overlay"></div>}
+
       <div className="mobile-header">
         <h2>AI <span>CRM</span></h2>
         <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
@@ -264,9 +266,9 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
             <button className="menu-toggle-btn" onClick={() => setIsMobileMenuOpen(true)}><Menu size={26} /></button>
         </div>
       </div>
-      <div className={`mobile-overlay ${isMobileMenuOpen ? 'show' : ''}`} onClick={() => setIsMobileMenuOpen(false)}></div>
+      <div className={`mobile-overlay ${isMobileMenuOpen && !isTourActive ? 'show' : ''}`} onClick={() => setIsMobileMenuOpen(false)}></div>
 
-      <div className={`sidebar ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
+      <div className={`sidebar ${isMobileMenuOpen ? 'mobile-open' : ''}`} style={{ zIndex: isTourActive ? 10000 : '' }}>
         <div className="sidebar-top">
           <div className="logo-area">
             <div className="logo-3d">🤖</div><h2>AI <span>CRM</span></h2>
@@ -283,8 +285,8 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
           <div className="history-section">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <p className="section-label" style={{ marginBottom: 0 }}>ACTIVITY LOG</p>
-                {/* --- SMALL ICON ONLY NEW CHAT BUTTON --- */}
-                <button className="new-chat-btn" onClick={handleNewChat} title="Start New Chat">
+                {/* --- TOUR TARGET 1: NEW CHAT BUTTON (GLOW ONLY) --- */}
+                <button className={`new-chat-btn ${isTourActive && tourStep === 0 ? 'tour-target-glow' : ''}`} onClick={handleNewChat} title="Start New Chat">
                     <Plus size={15} strokeWidth={2.5} />
                 </button>
             </div>
@@ -302,7 +304,8 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
           </div>
         </div>
         
-        <div className="sidebar-bottom">
+        {/* --- TOUR TARGET 3: SYSTEM UTILITIES --- */}
+        <div className={`sidebar-bottom ${isTourActive && tourStep === 2 ? 'tour-target-glow' : ''}`}>
           <button className="util-btn active"><MessageSquare size={16} /> Chat Assistant</button>
           {isAdmin && (
               <button className="util-btn" onClick={() => { setShowModal(true); setIsMobileMenuOpen(false); }}><Eraser size={16} /> Clear System Chat</button>
@@ -313,7 +316,7 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
         </div>
       </div>
 
-      <div className="main">
+      <div className="main" style={{ zIndex: isTourActive && tourStep === 1 ? 9991 : '' }}>
         <div id="chat-box" ref={chatBoxRef}>
           <AnimatePresence>
             {messages.map((msg) => (
@@ -322,7 +325,8 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
           </AnimatePresence>
         </div>
         <div className="input-container">
-          <div className="input-area">
+          {/* --- TOUR TARGET 2: INPUT AREA (GLOW ONLY) --- */}
+          <div className={`input-area ${isTourActive && tourStep === 1 ? 'tour-target-glow' : ''}`}>
             <input value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()} placeholder="Enter command or query..." autoFocus autoComplete="off" />
             <div className="action-buttons" style={{ display: 'flex', gap: '6px' }}>
               <button className={`icon-btn ${isListening ? 'listening' : ''}`} onClick={startVoice} style={isListening ? { background: '#ff4757', color: '#fff' } : {}}><Mic size={18} /></button>
@@ -333,8 +337,44 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
       </div>
 
       <AnimatePresence>
+        {/* --- TOUR TOOLTIP POPUP (ALWAYS ON TOP) --- */}
+        {isTourActive && (
+            <motion.div 
+                className="tour-tooltip"
+                style={tourData[tourStep].style(window.innerWidth <= 768)}
+                initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                key={`tour-${tourStep}`}
+                transition={{ duration: 0.3 }}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                    <div style={{ background: 'rgba(255,140,0,0.1)', color: 'var(--primary)', padding: '8px', borderRadius: '10px', display: 'flex' }}>
+                        {tourStep === 0 ? <Plus size={20} /> : tourStep === 1 ? <MessageSquare size={20} /> : <Database size={20} />}
+                    </div>
+                    <h3 style={{ fontSize: '16px', margin: 0, fontFamily: "'Syne', sans-serif", fontWeight: 700 }}>
+                        {tourData[tourStep].title}
+                    </h3>
+                </div>
+                <p style={{ fontSize: '13.5px', color: 'var(--text-dim)', marginBottom: '20px', lineHeight: '1.5' }}>
+                    {tourData[tourStep].desc}
+                </p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold', letterSpacing: '1px' }}>
+                        STEP {tourStep + 1} OF 3
+                    </span>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <button onClick={finishTour} style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Skip</button>
+                        <button onClick={handleTourNext} style={{ background: 'var(--primary-grad)', border: 'none', color: 'white', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '13.5px', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(255,140,0,0.3)' }}>
+                            {tourStep === 2 ? 'Done' : 'Next'}
+                        </button>
+                    </div>
+                </div>
+            </motion.div>
+        )}
+
         {showModal && isAdmin && (
-          <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: 'flex' }}>
+          <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: 'flex', zIndex: 9999 }}>
             <motion.div className="modal-card" initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.88 }} transition={{ duration: 0.25, ease: [0.34, 1.56, 0.64, 1] }}>
               <Trash2 size={35} color="#ff4757" style={{ margin: '0 auto 15px', display: 'block' }} />
               <h3>Wipe Chat History?</h3>
@@ -347,7 +387,7 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
         )}
 
         {itemToDelete && (
-          <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: 'flex' }}>
+          <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: 'flex', zIndex: 9999 }}>
             <motion.div className="modal-card" initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.88 }} transition={{ duration: 0.25, ease: [0.34, 1.56, 0.64, 1] }}>
               <Trash2 size={35} color="#ff4757" style={{ margin: '0 auto 15px', display: 'block' }} />
               <h3>Delete this history?</h3>
@@ -377,7 +417,8 @@ export default function App() {
 
   return (
     <>
-      <Toaster position="top-right" />
+      {/* ADDED UNSTYLED TO STRIP ALL SONNER DEFAULT CSS */}
+      <Toaster position="top-right" theme={isDarkMode ? "dark" : "light"} toastOptions={{ unstyled: true }} />
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={!isAuthenticated ? <Login setAuth={setIsAuthenticated} setUserRole={setUserRole} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} /> : <Navigate to="/dashboard" />} />
