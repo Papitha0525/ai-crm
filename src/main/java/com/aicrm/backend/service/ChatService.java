@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -33,47 +34,47 @@ public class ChatService {
     public ChatResponse processMessage(ChatRequest request) {
 
         String originalMsg = request.getMessage().trim();
-        String msg = originalMsg.toLowerCase().trim();
+        String msg = originalMsg.toLowerCase(Locale.ROOT).trim();
+
+        String role = getRole(request);
 
         ChatResponse response;
 
         try {
 
             // =====================================
-            // CANCEL / RESET
+            // CANCEL
             // =====================================
-            if (msg.contains("cancel") || msg.contains("reset") ||
-                msg.contains("stop") || msg.equals("exit")) {
+            if (msg.equals("cancel") || msg.equals("reset")
+                    || msg.equals("stop") || msg.equals("exit")) {
 
                 waitingLeadInput = false;
                 pendingLead = null;
                 pendingDeleteList.clear();
 
                 response = new ChatResponse(
-                    "✅ Cancelled. How can I help you?",
-                    "CANCELLED", null
+                        "✅ Cancelled successfully.",
+                        "CANCELLED",
+                        null
                 );
             }
 
             // =====================================
             // GREETING
             // =====================================
-            else if (msg.contains("hi") || msg.contains("hello") ||
-                     msg.contains("hey") || msg.contains("hii") ||
-                     msg.contains("hiii") || msg.equals("h")) {
-
-                waitingLeadInput = false;
-                pendingLead = null;
+            else if (msg.equals("hi") || msg.equals("hello")
+                    || msg.equals("hey")) {
 
                 response = new ChatResponse(
-                    "Hello 👋\n\nI am your AI CRM Assistant.\n\n" +
-                    "You can say:\n" +
-                    "• create lead for Ravi 9876543210 ravi@gmail.com Chennai\n" +
-                    "• show leads\n" +
-                    "• delete Ravi\n" +
-                    "• update #1 email ravi@gmail.com\n" +
-                    "• what is crm",
-                    "GREETING", null
+                        "👋 Hello " + role + "\n\n"
+                                + "Available commands:\n"
+                                + "• create lead for Ravi 9876543210 ravi@gmail.com Chennai\n"
+                                + "• show leads\n"
+                                + "• show won deals\n"
+                                + "• show lead Ravi\n"
+                                + "• update #1 phone 9999999999",
+                        "GREETING",
+                        null
                 );
             }
 
@@ -87,13 +88,19 @@ public class ChatService {
                 String missing = getMissingFields();
 
                 if (!missing.isBlank()) {
+
                     response = new ChatResponse(
-                        "Please provide missing details:\n\n" + missing,
-                        "REQUIRED_FIELDS", null
+                            "Please provide:\n\n" + missing,
+                            "REQUIRED",
+                            null
                     );
+
                 } else {
+
                     pendingLead.setRequirement("General");
                     pendingLead.setSource("CHAT");
+                    pendingLead.setDealStatus("PENDING");
+                    pendingLead.setStatus("NEW");
 
                     Lead lead = leadService.createLead(pendingLead);
 
@@ -101,38 +108,13 @@ public class ChatService {
                     pendingLead = null;
 
                     response = new ChatResponse(
-                        "✅ Lead created successfully!\n\n" +
-                        "👤 Name  : " + lead.getName() + "\n" +
-                        "📞 Phone : " + lead.getPhone() + "\n" +
-                        "📧 Email : " + lead.getEmail() + "\n" +
-                        "🏙 City  : " + lead.getCity(),
-                        "LEAD_CREATED", lead
-                    );
-                }
-            }
-
-            // =====================================
-            // DELETE CHOICE (number)
-            // =====================================
-            else if (msg.matches("\\d+") && !pendingDeleteList.isEmpty()) {
-
-                int choice = Integer.parseInt(msg);
-
-                if (choice >= 1 && choice <= pendingDeleteList.size()) {
-
-                    Lead selected = pendingDeleteList.get(choice - 1);
-                    boolean deleted = leadService.deleteLead(selected.getId());
-                    pendingDeleteList.clear();
-
-                    response = new ChatResponse(
-                        deleted ? "🗑 Lead deleted successfully."
-                                : "❌ Delete failed.",
-                        deleted ? "DELETED" : "FAILED", null
-                    );
-                } else {
-                    response = new ChatResponse(
-                        "❌ Invalid option. Choose valid number.",
-                        "INVALID_OPTION", null
+                            "✅ Lead created successfully\n\n"
+                                    + "👤 " + lead.getName()
+                                    + "\n📞 " + lead.getPhone()
+                                    + "\n📧 " + lead.getEmail()
+                                    + "\n🏙 " + lead.getCity(),
+                            "CREATED",
+                            lead
                     );
                 }
             }
@@ -140,495 +122,582 @@ public class ChatService {
             // =====================================
             // CREATE LEAD
             // =====================================
-            else if (msg.contains("create") && msg.contains("lead")) {
+            else if (msg.matches(".*create.*lead.*")){
 
                 pendingLead = new LeadDto();
+
                 pendingLead.setName(extractName(originalMsg));
                 pendingLead.setPhone(extractPhone(originalMsg));
                 pendingLead.setEmail(extractEmail(originalMsg));
                 pendingLead.setCity(extractCity(originalMsg));
+                pendingLead.setRequirement(extractRequirement(originalMsg));
 
                 String missing = getMissingFields();
 
                 if (!missing.isBlank()) {
+
                     waitingLeadInput = true;
+
                     response = new ChatResponse(
-                        "Please provide missing details:\n\n" + missing,
-                        "REQUIRED_FIELDS", null
+                            "Need these details:\n\n" + missing,
+                            "REQUIRED",
+                            null
                     );
+
                 } else {
-                    pendingLead.setRequirement("General");
+
+                    if (isBlank(pendingLead.getRequirement())) {
+                        pendingLead.setRequirement("General");
+                    }
+
                     pendingLead.setSource("CHAT");
+                    pendingLead.setDealStatus("PENDING");
+                    pendingLead.setStatus("NEW");
 
                     Lead lead = leadService.createLead(pendingLead);
+
                     pendingLead = null;
 
                     response = new ChatResponse(
-                        "✅ Lead created successfully!\n\n" +
-                        "👤 Name  : " + lead.getName() + "\n" +
-                        "📞 Phone : " + lead.getPhone() + "\n" +
-                        "📧 Email : " + lead.getEmail() + "\n" +
-                        "🏙 City  : " + lead.getCity(),
-                        "LEAD_CREATED", lead
+                            "✅ Lead created successfully\n\n"
+                                    + "👤 " + lead.getName(),
+                            "CREATED",
+                            lead
                     );
                 }
             }
 
             // =====================================
-            // DELETE LEAD
+            // ADMIN ONLY DELETE
             // =====================================
             else if (msg.startsWith("delete")) {
 
-                String name = extractDeleteName(originalMsg);
-                List<Lead> leads = leadService.findAllByName(name);
+                if (!role.equals("ADMIN")) {
 
-                if (leads.isEmpty()) {
                     response = new ChatResponse(
-                        "❌ Lead not found: " + name,
-                        "NOT_FOUND", null
+                            "❌ Only ADMIN can delete leads.",
+                            "DENIED",
+                            null
                     );
-                } else if (leads.size() == 1) {
-                    boolean deleted = leadService.deleteLead(
-                                        leads.get(0).getId());
-                    response = new ChatResponse(
-                        deleted ? "🗑 Lead deleted: " + name
-                                : "❌ Delete failed.",
-                        deleted ? "DELETED" : "FAILED", null
-                    );
+
                 } else {
-                    pendingDeleteList = leads;
-                    StringBuilder sb = new StringBuilder();
-                    sb.append(leads.size())
-                      .append(" leads found with name '")
-                      .append(name)
-                      .append("'.\n\nChoose one to delete:\n\n");
-                    for (int i = 0; i < leads.size(); i++) {
-                        Lead l = leads.get(i);
-                        sb.append(i + 1).append(". ")
-                          .append(l.getName()).append(" - ")
-                          .append(l.getPhone()).append("\n");
-                    }
-                    response = new ChatResponse(
-                        sb.toString(), "MULTIPLE_FOUND", null
-                    );
-                }
-            }
 
-            // =====================================
-            // UPDATE BY LEAD ID (#1, #2...)
-            // =====================================
-            else if (msg.contains("update") && msg.contains("#")) {
+                    String name = extractDeleteName(originalMsg);
+                    List<Lead> leads = leadService.findAllByName(name);
+                    if (leads.isEmpty()) {
 
-                Pattern idPattern = Pattern.compile("#(\\d+)");
-                Matcher idMatcher = idPattern.matcher(msg);
-
-                if (!idMatcher.find()) {
-                    response = new ChatResponse(
-                        "Please say: update #1 email xxx@gmail.com",
-                        "INVALID", null
-                    );
-                } else {
-                    int leadNumber = Integer.parseInt(idMatcher.group(1));
-                    List<Lead> allLeads = leadService.getAllLeads();
-
-                    if (leadNumber < 1 || leadNumber > allLeads.size()) {
                         response = new ChatResponse(
-                            "❌ Lead #" + leadNumber + " not found!",
-                            "NOT_FOUND", null
+                                "❌ Lead not found : " + name,
+                                "NOT_FOUND",
+                                null
                         );
-                    } else {
-                        Lead lead = allLeads.get(leadNumber - 1);
-                        Long leadId = lead.getId();
-                        String updateMsg = "❌ Unknown field to update.";
-                        String action = "UNKNOWN";
 
-                        if (msg.contains("email")) {
-                            String email = extractEmail(originalMsg);
-                            if (email.isEmpty()) {
-                                updateMsg = "❌ Please provide valid email!";
-                            } else if (!isValidEmail(email)) {
-                                updateMsg = "❌ Invalid email format! Use: example@gmail.com";
-                            } else {
-                                leadService.updateFieldById(leadId, "email", email);
-                                updateMsg = "✅ Email updated for Lead #" + leadNumber
-                                          + "\nNew Email: " + email;
-                                action = "UPDATED";
-                            }
-                        } else if (msg.contains("phone") || msg.contains("number")) {
-                            String phone = extractPhone(originalMsg);
-                            if (phone.isEmpty()) {
-                                updateMsg = "❌ Please provide 10 digit phone!";
-                            } else if (phone.length() != 10) {
-                                updateMsg = "❌ Phone must be exactly 10 digits!";
-                            } else {
-                                leadService.updateFieldById(leadId, "phone", phone);
-                                updateMsg = "✅ Phone updated for Lead #" + leadNumber
-                                          + "\nNew Phone: " + phone;
-                                action = "UPDATED";
-                            }
-                        } else if (msg.contains("name")) {
-                            Pattern nameP = Pattern.compile(
-                                "name\\s+to\\s+([a-zA-Z]+)",
-                                Pattern.CASE_INSENSITIVE);
-                            Matcher nameM = nameP.matcher(originalMsg);
-                            if (nameM.find()) {
-                                String newName = nameM.group(1).trim();
-                                leadService.updateFieldById(leadId, "name", newName);
-                                updateMsg = "✅ Name updated for Lead #" + leadNumber
-                                          + "\nNew Name: " + newName;
-                                action = "UPDATED";
-                            } else {
-                                updateMsg = "❌ Say: update #1 name to NewName";
-                            }
-                        } else if (msg.contains("city")) {
-                            Pattern cityP = Pattern.compile(
-                                "city\\s+to\\s+([a-zA-Z]+)",
-                                Pattern.CASE_INSENSITIVE);
-                            Matcher cityM = cityP.matcher(originalMsg);
-                            if (cityM.find()) {
-                                String newCity = cityM.group(1).trim();
-                                leadService.updateFieldById(leadId, "city", newCity);
-                                updateMsg = "✅ City updated for Lead #" + leadNumber
-                                          + "\nNew City: " + newCity;
-                                action = "UPDATED";
-                            } else {
-                                updateMsg = "❌ Say: update #1 city to Chennai";
-                            }
-                        } else if (msg.contains("status") || msg.contains("deal")) {
-                            String newStatus = "PENDING";
-                            if (msg.contains("won")) newStatus = "WON";
-                            else if (msg.contains("lost")) newStatus = "LOST";
-                            leadService.updateFieldById(leadId, "dealStatus", newStatus);
-                            updateMsg = "✅ Status updated for Lead #" + leadNumber
-                                      + "\nNew Status: " + newStatus;
-                            action = "UPDATED";
-                        } else if (msg.contains("follow")) {
-                            Pattern followP = Pattern.compile(
-                                "follow\\s*up\\s+to\\s+(.+)",
-                                Pattern.CASE_INSENSITIVE);
-                            Matcher followM = followP.matcher(originalMsg);
-                            if (followM.find()) {
-                                String newFollow = followM.group(1).trim();
-                                leadService.updateFieldById(leadId, "followUp", newFollow);
-                                updateMsg = "✅ Follow up updated for Lead #" + leadNumber
-                                          + "\nFollow Up: " + newFollow;
-                                action = "UPDATED";
-                            } else {
-                                updateMsg = "❌ Say: update #1 follow up to Call tomorrow";
-                            }
+                    } else if (leads.size() == 1) {
+
+                        boolean deleted =
+                                leadService.deleteLead(leads.get(0).getId());
+
+                        response = new ChatResponse(
+                                deleted
+                                        ? "🗑 Lead deleted successfully."
+                                        : "❌ Delete failed.",
+                                deleted ? "DELETED" : "FAILED",
+                                null
+                        );
+
+                    } else {
+
+                        pendingDeleteList = leads;
+
+                        StringBuilder sb = new StringBuilder();
+                        sb.append("Multiple leads found:\n\n");
+
+                        for (int i = 0; i < leads.size(); i++) {
+                            Lead l = leads.get(i);
+
+                            sb.append(i + 1)
+                                    .append(". ")
+                                    .append(l.getName())
+                                    .append(" - ")
+                                    .append(l.getPhone())
+                                    .append("\n");
                         }
 
-                        response = new ChatResponse(updateMsg, action, null);
+                        sb.append("\nReply with number to delete.");
+
+                        response = new ChatResponse(
+                                sb.toString(),
+                                "MULTIPLE_FOUND",
+                                null
+                        );
                     }
                 }
             }
 
             // =====================================
-            // CHANGE PHONE
+            // DELETE CHOICE
             // =====================================
-            else if (msg.contains("change") && msg.contains("phone")) {
+            else if (msg.matches("\\d+") && !pendingDeleteList.isEmpty()) {
 
-                String name = extractUpdateName(originalMsg);
-                String phone = extractPhone(originalMsg);
+                if (!role.equals("ADMIN")) {
 
-                if (phone.isEmpty() || phone.length() != 10) {
                     response = new ChatResponse(
-                        "❌ Phone must be exactly 10 digits.",
-                        "INVALID_PHONE", null
+                            "❌ Only ADMIN can delete.",
+                            "DENIED",
+                            null
                     );
+
                 } else {
-                    boolean updated = leadService.updatePhoneByName(name, phone);
-                    response = new ChatResponse(
-                        updated ? "✅ Phone updated for: " + name
-                                : "❌ Lead not found: " + name,
-                        updated ? "UPDATED" : "NOT_FOUND", null
-                    );
+
+                    int choice = Integer.parseInt(msg);
+
+                    if (choice >= 1 && choice <= pendingDeleteList.size()) {
+
+                        Lead selected =
+                                pendingDeleteList.get(choice - 1);
+
+                        boolean deleted =
+                                leadService.deleteLead(selected.getId());
+
+                        pendingDeleteList.clear();
+
+                        response = new ChatResponse(
+                                deleted
+                                        ? "🗑 Lead deleted."
+                                        : "❌ Delete failed.",
+                                deleted ? "DELETED" : "FAILED",
+                                null
+                        );
+
+                    } else {
+
+                        response = new ChatResponse(
+                                "❌ Invalid number.",
+                                "INVALID",
+                                null
+                        );
+                    }
                 }
             }
 
             // =====================================
-            // WON
+            // SHOW BY NAME
             // =====================================
-            else if (msg.contains("won") || msg.contains("win")) {
+            else if (msg.startsWith("show lead ")) {
 
-                String name = msg.replace("won", "").replace("win", "").trim();
-                boolean updated = leadService.updateDealStatus(name, "WON");
-                response = new ChatResponse(
-                    updated ? "🏆 Deal marked as WON for: " + name
-                            : "❌ Lead not found: " + name,
-                    updated ? "WON" : "NOT_FOUND", null
+                String name =
+                        originalMsg.substring(10).trim();
+
+                List<Lead> leads =
+                        leadService.findAllByName(name);
+
+                response = buildLeadResponse(leads, role);
+            }
+
+            // =====================================
+            // SHOW WON DEALS
+            // =====================================
+            else if (msg.contains("show won")) {
+
+                List<Lead> leads =
+                        leadService.getWonLeads();
+
+                response = buildLeadResponse(
+                        filterByRole(leads, request, role),
+                        role
                 );
             }
 
             // =====================================
-            // LOST
+            // SHOW LOST DEALS
             // =====================================
-            else if (msg.contains("lost") || msg.contains("loss")) {
+            else if (msg.contains("show lost")) {
 
-                String name = msg.replace("lost", "").replace("loss", "").trim();
-                boolean updated = leadService.updateDealStatus(name, "LOST");
-                response = new ChatResponse(
-                    updated ? "❌ Deal marked as LOST for: " + name
-                            : "❌ Lead not found: " + name,
-                    updated ? "LOST" : "NOT_FOUND", null
+                List<Lead> leads =
+                        leadService.getLostLeads();
+
+                response = buildLeadResponse(
+                        filterByRole(leads, request, role),
+                        role
                 );
             }
 
             // =====================================
-            // FOLLOW UP
+            // SHOW PENDING DEALS
             // =====================================
-            else if (msg.contains("follow up") || msg.contains("followup")) {
+            else if (msg.contains("show pending")) {
 
-                String[] parts = originalMsg.split("for");
-                if (parts.length >= 2) {
-                    String note = parts[0].replaceAll(
-                        "(?i)follow up|followup", "").trim();
-                    String name = parts[1].trim();
-                    boolean updated = leadService.updateFollowUp(name, note);
-                    response = new ChatResponse(
-                        updated ? "📅 Follow up added for: " + name
-                                : "❌ Lead not found: " + name,
-                        updated ? "FOLLOWUP_ADDED" : "NOT_FOUND", null
-                    );
-                } else {
-                    response = new ChatResponse(
-                        "Please say: follow up [note] for [name]",
-                        "INVALID", null
-                    );
+                List<Lead> leads =
+                        leadService.getAllLeads();
+
+                List<Lead> pending = new ArrayList<>();
+
+                for (Lead l : leads) {
+                    if ("PENDING".equalsIgnoreCase(
+                            l.getDealStatus())) {
+                        pending.add(l);
+                    }
                 }
+
+                response = buildLeadResponse(
+                        filterByRole(pending, request, role),
+                        role
+                );
             }
 
             // =====================================
             // SHOW LEADS
             // =====================================
-            else if (msg.contains("show lead") || msg.contains("list lead")) {
+            else if (msg.equals("show leads")
+                    || msg.equals("list leads")) {
 
-                List<Lead> leads = leadService.getAllLeads();
+                List<Lead> leads;
 
-                if (leads.isEmpty()) {
-                    response = new ChatResponse(
-                        "No leads available.", "EMPTY", null
+                if (role.equals("ADMIN")) {
+
+                    leads = leadService.getAllLeads();
+
+                } else if (role.equals("SALESMAN")) {
+
+                    leads = leadService.getAssignedLeads(
+                            request.getUserId()
                     );
+
                 } else {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append("📋 Total Leads: ").append(leads.size()).append("\n\n");
-                    int i = 1;
-                    for (Lead l : leads) {
-                        sb.append("━━━━━━━━━━━━━━━━━━━━\n")
-                          .append("🔢 Lead #").append(i++).append("\n")
-                          .append("👤 Name     : ")
-                          .append(l.getName() != null ? l.getName() : "-").append("\n")
-                          .append("📞 Phone    : ")
-                          .append(l.getPhone() != null ? l.getPhone() : "-").append("\n")
-                          .append("📧 Email    : ")
-                          .append(l.getEmail() != null ? l.getEmail() : "-").append("\n")
-                          .append("🏙 City     : ")
-                          .append(l.getCity() != null ? l.getCity() : "-").append("\n")
-                          .append("💼 Deal     : ")
-                          .append(l.getDealStatus() != null ? l.getDealStatus() : "PENDING").append("\n")
-                          .append("📅 Follow Up: ")
-                          .append(l.getFollowUp() != null ? l.getFollowUp() : "None").append("\n");
+
+                    response = new ChatResponse(
+                            "❌ USER cannot see all leads.",
+                            "DENIED",
+                            null
+                    );
+
+                    saveChatHistory(
+                            request,
+                            response.getReply()
+                    );
+
+                    return response;
+                }
+
+                response = buildLeadResponse(leads, role);
+            }
+
+            // =====================================
+            // UPDATE LEAD
+            // =====================================
+            else if (msg.contains("update")
+                    && msg.contains("#")) {
+                Pattern p = Pattern.compile("#(\\d+)");
+                Matcher m = p.matcher(msg);
+
+                if (!m.find()) {
+
+                    response = new ChatResponse(
+                            "Use: update #1 phone 9999999999",
+                            "INVALID",
+                            null
+                    );
+
+                } else {
+
+                    int no = Integer.parseInt(m.group(1));
+
+                    List<Lead> leads = role.equals("ADMIN")
+                            ? leadService.getAllLeads()
+                            : leadService.getAssignedLeads(
+                                    request.getUserId());
+
+                    if (no < 1 || no > leads.size()) {
+
+                        response = new ChatResponse(
+                                "❌ Lead not found.",
+                                "NOT_FOUND",
+                                null
+                        );
+
+                    } else {
+
+                        Lead lead = leads.get(no - 1);
+
+                        if (msg.contains("phone")) {
+
+                            String phone =
+                                    extractPhone(originalMsg);
+
+                            leadService.updateFieldById(
+                                    lead.getId(),
+                                    "phone",
+                                    phone
+                            );
+
+                            response = new ChatResponse(
+                                    "✅ Phone updated.",
+                                    "UPDATED",
+                                    null
+                            );
+
+                        } else if (msg.contains("email")) {
+
+                            String email =
+                                    extractEmail(originalMsg);
+
+                            leadService.updateFieldById(
+                                    lead.getId(),
+                                    "email",
+                                    email
+                            );
+
+                            response = new ChatResponse(
+                                    "✅ Email updated.",
+                                    "UPDATED",
+                                    null
+                            );
+
+                        } else {
+
+                            response = new ChatResponse(
+                                    "❌ Unknown field.",
+                                    "INVALID",
+                                    null
+                            );
+                        }
                     }
-                    sb.append("━━━━━━━━━━━━━━━━━━━━");
-                    response = new ChatResponse(sb.toString(), "SHOW_LEADS", leads);
                 }
             }
 
             // =====================================
-            // DEFAULT — AI (Groq)
+            // DEFAULT AI
             // =====================================
             else {
 
-                String aiReply = "AI service unavailable.";
+                String aiReply =
+                        "AI unavailable.";
 
                 if (aiService != null) {
-                    aiReply = aiService.askGroq(originalMsg);
+                    aiReply =
+                            aiService.askGroq(originalMsg);
                 }
 
-                response = new ChatResponse(aiReply, "AI_REPLY", null);
+                response = new ChatResponse(
+                        aiReply,
+                        "AI_REPLY",
+                        null
+                );
             }
 
-            saveChatHistory(request, response.getReply());
+            saveChatHistory(
+                    request,
+                    response.getReply()
+            );
+
             return response;
 
         } catch (Exception e) {
+
             e.printStackTrace();
+
             return new ChatResponse(
-                "Error: " + e.getMessage(), "ERROR", null
+                    "Error : " + e.getMessage(),
+                    "ERROR",
+                    null
             );
         }
     }
 
     // =====================================
-    // FILL MISSING FIELDS
+    // ROLE
     // =====================================
-    private void fillMissingLeadFields(String text) {
+    private String getRole(ChatRequest request) {
 
-        if (isBlank(pendingLead.getName())) {
-            String name = extractName(text);
-            if (!name.isBlank()) {
-                pendingLead.setName(name);
-                return;
-            }
-        }
+        if ("1".equals(request.getUserId()))
+            return "ADMIN";
 
-        if (isBlank(pendingLead.getPhone())) {
-            String phone = extractPhone(text);
-            if (!phone.isBlank()) {
-                pendingLead.setPhone(phone);
-                return;
-            }
-        }
+        if ("2".equals(request.getUserId()))
+            return "SALESMAN";
 
-        if (isBlank(pendingLead.getEmail())) {
-            String email = extractEmail(text);
-            if (!email.isBlank()) {
-                pendingLead.setEmail(email);
-                return;
-            }
-        }
-
-        if (isBlank(pendingLead.getCity())) {
-            String city = extractCity(text);
-            if (!city.isBlank()) {
-                pendingLead.setCity(city);
-            } else if (text.trim().matches("[a-zA-Z]+")) {
-                pendingLead.setCity(text.trim());
-            }
-        }
+        return "USER";
     }
 
     // =====================================
-    // VALIDATION — All 4 fields required
+    // RESPONSE BUILDER
     // =====================================
-    private String getMissingFields() {
+    private ChatResponse buildLeadResponse(
+            List<Lead> leads,
+            String role) {
 
-        StringBuilder missing = new StringBuilder();
+        if (leads == null || leads.isEmpty()) {
 
-        // Name
-        if (isBlank(pendingLead.getName()))
-            missing.append("• Name\n");
-
-        // Phone — must be 10 digits
-        if (isBlank(pendingLead.getPhone())) {
-            missing.append("• Phone number (10 digits)\n");
-        } else if (pendingLead.getPhone().length() != 10) {
-            missing.append("• Phone must be exactly 10 digits! " +
-                          "(entered: " + pendingLead.getPhone().length() + " digits)\n");
-            pendingLead.setPhone(null); // reset
+            return new ChatResponse(
+                    "No leads found.",
+                    "EMPTY",
+                    null
+            );
         }
 
-        // Email — must be valid format
-        if (isBlank(pendingLead.getEmail())) {
-            missing.append("• Email (example@gmail.com)\n");
-        } else if (!isValidEmail(pendingLead.getEmail())) {
-            missing.append("• Valid Email format! Use: example@gmail.com\n");
-            pendingLead.setEmail(null); // reset
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("📋 Leads : ")
+          .append(leads.size())
+          .append("\n\n");
+
+        int i = 1;
+
+        for (Lead l : leads) {
+
+            sb.append("#").append(i++).append("\n");
+            sb.append("👤 ").append(l.getName()).append("\n");
+
+            if (!role.equals("USER")) {
+                sb.append("📞 ").append(nvl(l.getPhone())).append("\n");
+                sb.append("📧 ").append(nvl(l.getEmail())).append("\n");
+            }
+
+            sb.append("🏙 ").append(nvl(l.getCity())).append("\n");
+            sb.append("💼 ").append(nvl(l.getDealStatus())).append("\n");
+            sb.append("──────────────\n");
         }
 
-        // City
-        if (isBlank(pendingLead.getCity()))
-            missing.append("• City\n");
+        return new ChatResponse(
+                sb.toString(),
+                "SHOW",
+                leads
+        );
+    }
 
-        return missing.toString().trim();
+    private List<Lead> filterByRole(
+            List<Lead> leads,
+            ChatRequest request,
+            String role) {
+
+        if (role.equals("ADMIN"))
+            return leads;
+
+        if (role.equals("SALESMAN"))
+            return leadService.getAssignedLeads(
+                    request.getUserId());
+
+        return new ArrayList<>();
+    }
+
+    private String nvl(String v) {
+        return v == null ? "-" : v;
     }
 
     // =====================================
     // HELPERS
     // =====================================
-    private boolean isBlank(String text) {
-        return text == null || text.trim().isEmpty();
+    private boolean isBlank(String v) {
+        return v == null || v.trim().isEmpty();
     }
 
-    private boolean isValidEmail(String email) {
-        if (email == null || email.trim().isEmpty()) return false;
-        Pattern p = Pattern.compile(
-            "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
-        return p.matcher(email.trim()).matches();
+    private String getMissingFields() {
+
+        StringBuilder sb = new StringBuilder();
+
+        if (isBlank(pendingLead.getName()))
+            sb.append("• Name\n");
+
+        if (isBlank(pendingLead.getPhone()))
+            sb.append("• Phone\n");
+
+        if (isBlank(pendingLead.getEmail()))
+            sb.append("• Email\n");
+
+        if (isBlank(pendingLead.getCity()))
+            sb.append("• City\n");
+
+        if (isBlank(pendingLead.getRequirement()))
+        sb.append("• Requirement\n");
+
+        return sb.toString();
+    }
+
+    private void fillMissingLeadFields(String t) {
+
+        if (isBlank(pendingLead.getName()))
+            pendingLead.setName(extractName(t));
+
+        if (isBlank(pendingLead.getPhone()))
+            pendingLead.setPhone(extractPhone(t));
+
+        if (isBlank(pendingLead.getEmail()))
+            pendingLead.setEmail(extractEmail(t));
+
+        if (isBlank(pendingLead.getCity()))
+            pendingLead.setCity(extractCity(t));
+
+        if (isBlank(pendingLead.getRequirement()))
+        pendingLead.setRequirement(t.trim());
     }
 
     private String extractName(String text) {
-        // "for Ravi" pattern
-        Pattern p = Pattern.compile(
-            "(?:for|name)\\s+([A-Z][a-z]+(?:\\s+[A-Z][a-z]+)*)",
-            Pattern.CASE_INSENSITIVE);
-        Matcher m = p.matcher(text);
-        if (m.find()) return m.group(1).trim();
-
-        // First word after "lead"
-        Pattern p2 = Pattern.compile(
-            "lead\\s+([A-Za-z]+)",
-            Pattern.CASE_INSENSITIVE);
-        Matcher m2 = p2.matcher(text);
-        if (m2.find()) return m2.group(1).trim();
-
-        return "";
+        Matcher m = Pattern.compile(
+                "(?i)for\\s+([a-zA-Z]+)")
+                .matcher(text);
+        return m.find() ? m.group(1) : "";
     }
 
     private String extractPhone(String text) {
-        Pattern p = Pattern.compile("\\b\\d{10}\\b");
-        Matcher m = p.matcher(text);
+        Matcher m = Pattern.compile("\\d{10}")
+                .matcher(text);
         return m.find() ? m.group() : "";
     }
 
     private String extractEmail(String text) {
-        Pattern p = Pattern.compile(
-            "[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}");
-        Matcher m = p.matcher(text);
+        Matcher m = Pattern.compile(
+                "[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+")
+                .matcher(text);
         return m.find() ? m.group() : "";
     }
 
     private String extractCity(String text) {
-        if (text == null || text.trim().isEmpty()) return "";
-        String lower = text.toLowerCase();
 
-        // Known cities
-        if (lower.contains("chennai")) return "Chennai";
-        if (lower.contains("madurai")) return "Madurai";
-        if (lower.contains("coimbatore")) return "Coimbatore";
-        if (lower.contains("bangalore")) return "Bangalore";
-        if (lower.contains("mumbai")) return "Mumbai";
-        if (lower.contains("delhi")) return "Delhi";
-        if (lower.contains("hyderabad")) return "Hyderabad";
-        if (lower.contains("kolkata")) return "Kolkata";
-        if (lower.contains("pune")) return "Pune";
-        if (lower.contains("erode")) return "Erode";
-        if (lower.contains("salem")) return "Salem";
-        if (lower.contains("trichy")) return "Trichy";
-        if (lower.contains("vellore")) return "Vellore";
-        if (lower.contains("tirunelveli")) return "Tirunelveli";
-        if (lower.contains("tiruppur")) return "Tiruppur";
+        String[] cities = {
+                "chennai","madurai","coimbatore",
+                "erode","salem","trichy"
+        };
 
-        // "in Chennai" pattern
-        Pattern p = Pattern.compile(
-            "\\bin\\s+([A-Z][a-z]+)\\b",
-            Pattern.CASE_INSENSITIVE);
-        Matcher m = p.matcher(text);
-        if (m.find()) return m.group(1).trim();
+        for (String c : cities) {
+            if (text.toLowerCase().contains(c))
+                return c.substring(0,1).toUpperCase()
+                        + c.substring(1);
+        }
 
         return "";
     }
 
+    private String extractRequirement(String text) {
+        return "General";
+    }
+
     private String extractDeleteName(String text) {
-        return text.replaceFirst("(?i)delete", "").trim();
+        return text.replaceFirst(
+                "(?i)delete", "").trim();
     }
 
-    private String extractUpdateName(String text) {
-        Pattern p = Pattern.compile(
-            "change\\s+(.+?)\\s+phone",
-            Pattern.CASE_INSENSITIVE);
-        Matcher m = p.matcher(text);
-        return m.find() ? m.group(1).trim() : "";
-    }
+    private void saveChatHistory(
+            ChatRequest request,
+            String reply) {
 
-    private void saveChatHistory(ChatRequest request, String reply) {
         try {
-            ChatHistory history = new ChatHistory();
-            history.setUserId(Long.parseLong(request.getUserId()));
-            history.setSessionId(request.getSessionId());
-            history.setMessage(request.getMessage());
-            history.setResponse(reply);
-            chatHistoryRepository.save(history);
-        } catch (Exception ignored) {}
+
+            ChatHistory h = new ChatHistory();
+
+            h.setUserId(
+                    Long.parseLong(
+                            request.getUserId()));
+
+            h.setSessionId(
+                    request.getSessionId());
+
+            h.setMessage(
+                    request.getMessage());
+
+            h.setResponse(reply);
+
+            chatHistoryRepository.save(h);
+
+        } catch (Exception ignored) {
+        }
     }
 }
