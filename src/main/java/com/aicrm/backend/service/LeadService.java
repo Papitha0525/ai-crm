@@ -21,9 +21,9 @@ public class LeadService {
     @Autowired
     private UserRepository userRepository;
 
-    // ===============================
+    // =====================================
     // CREATE LEAD
-    // ===============================
+    // =====================================
     public Lead createLead(LeadDto dto) {
 
         Lead lead = new Lead();
@@ -33,94 +33,101 @@ public class LeadService {
         lead.setEmail(dto.getEmail());
         lead.setCity(dto.getCity());
         lead.setRequirement(dto.getRequirement());
+
         lead.setSource(
-                dto.getSource() != null &&
-                !dto.getSource().isBlank()
-                        ? dto.getSource()
-                        : "MANUAL"
+                isBlank(dto.getSource())
+                        ? "MANUAL"
+                        : dto.getSource()
         );
 
-        lead.setStatus("NEW");
-
-        lead.setFollowUp(dto.getFollowUp());
+        lead.setStatus(
+                isBlank(dto.getStatus())
+                        ? "NEW"
+                        : dto.getStatus()
+        );
 
         lead.setDealStatus(
-                dto.getDealStatus() != null &&
-                !dto.getDealStatus().isBlank()
-                        ? dto.getDealStatus()
-                        : "PENDING"
+                isBlank(dto.getDealStatus())
+                        ? "PENDING"
+                        : dto.getDealStatus()
         );
+
+        lead.setFollowUp(dto.getFollowUp());
 
         return leadRepository.save(lead);
     }
 
-    // ===============================
-    // GET ALL LEADS
-    // ===============================
+    // =====================================
+    // GET ALL
+    // =====================================
     public List<Lead> getAllLeads() {
         return leadRepository.findAll();
     }
 
-    // ===============================
-    // GET BY ID
-    // ===============================
     public Lead getLeadById(Long id) {
-        return leadRepository.findById(id).orElse(null);
+        return leadRepository.findById(id)
+                .orElse(null);
     }
 
-    // ===============================
-    // COUNT ALL LEADS
-    // ===============================
     public long getLeadCount() {
         return leadRepository.count();
     }
 
-    // ===============================
-    // FIND BY NAME
-    // ===============================
+    // =====================================
+    // FIND
+    // =====================================
     public Lead findByName(String name) {
-        return leadRepository.findByNameIgnoreCase(name);
+        return leadRepository
+                .findByNameIgnoreCase(name);
     }
 
     public List<Lead> findAllByName(String name) {
-        return leadRepository.findAllByNameIgnoreCase(name);
+        return leadRepository
+                .findAllByNameIgnoreCase(name);
     }
 
     public List<Lead> searchByName(String keyword) {
-        return leadRepository.findByNameContainingIgnoreCase(keyword);
+        return leadRepository
+                .findByNameContainingIgnoreCase(
+                        keyword);
     }
 
-    // ===============================
+    // =====================================
     // DELETE
-    // ===============================
+    // =====================================
     public boolean deleteLead(Long id) {
 
-        if (leadRepository.existsById(id)) {
-            leadRepository.deleteById(id);
-            return true;
+        if (!leadRepository.existsById(id)) {
+            return false;
         }
 
-        return false;
+        leadRepository.deleteById(id);
+        return true;
     }
 
     public boolean deleteLeadByName(String name) {
 
-        Lead lead = leadRepository.findByNameIgnoreCase(name);
+        Lead lead =
+                leadRepository
+                .findByNameIgnoreCase(name);
 
-        if (lead != null) {
-            leadRepository.delete(lead);
-            return true;
+        if (lead == null) {
+            return false;
         }
 
-        return false;
+        leadRepository.delete(lead);
+        return true;
     }
 
-    // ===============================
-    // UPDATE FULL LEAD
-    // ===============================
-    public Lead updateLead(Long id, LeadDto dto) {
+    // =====================================
+    // UPDATE FULL
+    // =====================================
+    public Lead updateLead(
+            Long id,
+            LeadDto dto) {
 
-        Optional<Lead> optional = leadRepository.findById(id);
+        Optional<Lead> optional =
+                leadRepository.findById(id);
 
         if (optional.isEmpty()) {
             return null;
@@ -134,16 +141,76 @@ public class LeadService {
         lead.setCity(dto.getCity());
         lead.setRequirement(dto.getRequirement());
         lead.setSource(dto.getSource());
+        lead.setStatus(dto.getStatus());
+        lead.setDealStatus(dto.getDealStatus());
+        lead.setFollowUp(dto.getFollowUp());
 
         return leadRepository.save(lead);
     }
 
-    // ===============================
-    // UPDATE PHONE
-    // ===============================
-    public boolean updatePhoneByName(String name, String phone) {
+    // =====================================
+    // UPDATE FIELD
+    // =====================================
+    public boolean updateFieldById(
+            Long id,
+            String field,
+            String value) {
 
-        Lead lead = leadRepository.findByNameIgnoreCase(name);
+        Optional<Lead> optional =
+                leadRepository.findById(id);
+
+        if (optional.isEmpty()) {
+            return false;
+        }
+
+        Lead lead = optional.get();
+
+        switch (field.toLowerCase()) {
+
+            case "name" ->
+                    lead.setName(value);
+
+            case "phone" ->
+                    lead.setPhone(value);
+
+            case "email" ->
+                    lead.setEmail(value);
+
+            case "city" ->
+                    lead.setCity(value);
+
+            case "status" ->
+                    lead.setStatus(value);
+
+            case "dealstatus" ->
+                    lead.setDealStatus(value);
+
+            case "followup" ->
+                    lead.setFollowUp(value);
+
+            case "requirement" ->
+                    lead.setRequirement(value);
+
+            default ->
+            {
+                return false;
+            }
+        }
+
+        leadRepository.save(lead);
+        return true;
+    }
+
+    // =====================================
+    // SIMPLE UPDATES
+    // =====================================
+    public boolean updatePhoneByName(
+            String name,
+            String phone) {
+
+        Lead lead =
+                leadRepository
+                .findByNameIgnoreCase(name);
 
         if (lead == null) {
             return false;
@@ -155,12 +222,13 @@ public class LeadService {
         return true;
     }
 
-    // ===============================
-    // DEAL STATUS
-    // ===============================
-    public boolean updateDealStatus(String name, String status) {
+    public boolean updateDealStatus(
+            String name,
+            String status) {
 
-        Lead lead = leadRepository.findByNameIgnoreCase(name);
+        Lead lead =
+                leadRepository
+                .findByNameIgnoreCase(name);
 
         if (lead == null) {
             return false;
@@ -172,61 +240,30 @@ public class LeadService {
         return true;
     }
 
-    // ===============================
-    // FOLLOW UP
-    // ===============================
-    public boolean updateFollowUp(String name, String followUp) {
+    public boolean updateFollowUp(
+            String name,
+            String note) {
 
-        Lead lead = leadRepository.findByNameIgnoreCase(name);
+        Lead lead =
+                leadRepository
+                .findByNameIgnoreCase(name);
 
         if (lead == null) {
             return false;
         }
 
-        lead.setFollowUp(followUp);
+        lead.setFollowUp(note);
         leadRepository.save(lead);
 
         return true;
     }
 
-    // ===============================
-    // UPDATE ANY FIELD
-    // ===============================
-    public boolean updateFieldById(
-            Long id,
-            String field,
-            String value
-    ) {
-
-        Optional<Lead> optional =
-                leadRepository.findById(id);
-
-        if (optional.isEmpty()) {
-            return false;
-        }
-
-        Lead lead = optional.get();
-
-        switch (field) {
-            case "name" -> lead.setName(value);
-            case "phone" -> lead.setPhone(value);
-            case "email" -> lead.setEmail(value);
-            case "city" -> lead.setCity(value);
-            case "status" -> lead.setStatus(value);
-            case "dealStatus" -> lead.setDealStatus(value);
-            case "followUp" -> lead.setFollowUp(value);
-            case "requirement" -> lead.setRequirement(value);
-        }
-
-        leadRepository.save(lead);
-
-        return true;
-    }
-
-    // ===============================
-    // ASSIGN LEAD TO SALESMAN
-    // ===============================
-    public boolean assignLead(Long leadId, Long userId) {
+    // =====================================
+    // ASSIGN LEAD
+    // =====================================
+    public boolean assignLead(
+            Long leadId,
+            Long userId) {
 
         Optional<Lead> leadOpt =
                 leadRepository.findById(leadId);
@@ -234,60 +271,165 @@ public class LeadService {
         Optional<User> userOpt =
                 userRepository.findById(userId);
 
-        if (leadOpt.isEmpty() || userOpt.isEmpty()) {
+        if (leadOpt.isEmpty()
+                || userOpt.isEmpty()) {
             return false;
         }
 
         Lead lead = leadOpt.get();
-        lead.setAssignedTo(userOpt.get());
+        User user = userOpt.get();
+
+        lead.setAssignedTo(user);
 
         leadRepository.save(lead);
-
         return true;
     }
 
-    // ===============================
-    // SALESMAN OWN LEADS
-    // ===============================
-    public List<Lead> getAssignedLeads(String email) {
-        return leadRepository.findByAssignedToEmail(email);
+    // assign lead #2 to Ravi
+    public boolean assignLeadToSalesmanName(
+            String command) {
+
+        try {
+
+            Long leadId = null;
+
+            java.util.regex.Matcher num =
+                    java.util.regex.Pattern
+                    .compile("#(\\d+)")
+                    .matcher(command);
+
+            if (num.find()) {
+
+                int index =
+                        Integer.parseInt(
+                                num.group(1));
+
+                List<Lead> all =
+                        getAllLeads();
+
+                if (index >= 1
+                        && index <= all.size()) {
+
+                    leadId =
+                            all.get(index - 1)
+                            .getId();
+                }
+            }
+
+            if (leadId == null) {
+
+                for (Lead l : getAllLeads()) {
+
+                    if (command.toLowerCase()
+                            .contains(
+                             l.getName()
+                             .toLowerCase())) {
+
+                        leadId = l.getId();
+                        break;
+                    }
+                }
+            }
+
+            if (leadId == null) {
+                return false;
+            }
+
+            String[] arr =
+                    command.trim()
+                    .split("\\s+");
+
+            String salesmanName =
+                    arr[arr.length - 1];
+
+            Optional<User> userOpt =
+                    userRepository
+                    .findByNameIgnoreCaseAndRole(
+                            salesmanName,
+                            "SALESMAN");
+
+            if (userOpt.isEmpty()) {
+                return false;
+            }
+
+            return assignLead(
+                    leadId,
+                    userOpt.get().getId()
+            );
+
+        } catch (Exception e) {
+            return false;
+        }
     }
 
-    public List<Lead> getAssignedLeadsByUserId(Long id) {
-        return leadRepository.findByAssignedToId(id);
+    // =====================================
+    // ASSIGNED LEADS
+    // =====================================
+    public List<Lead> getAssignedLeads(
+            String email) {
+
+        return leadRepository
+                .findByAssignedToEmail(email);
     }
 
-    // ===============================
-    // DASHBOARD COUNTS
-    // ===============================
+    public List<Lead> getAssignedLeadsByUserId(
+            Long id) {
+
+        return leadRepository
+                .findByAssignedToId(id);
+    }
+
+    // =====================================
+    // COUNTS
+    // =====================================
     public long getNewLeadsCount() {
-        return leadRepository.countByStatus("NEW");
+        return leadRepository
+                .countByStatus("NEW");
     }
 
     public long getWonDealsCount() {
-        return leadRepository.countByDealStatus("WON");
+        return leadRepository
+                .countByDealStatus("WON");
     }
 
     public long getLostDealsCount() {
-        return leadRepository.countByDealStatus("LOST");
+        return leadRepository
+                .countByDealStatus("LOST");
     }
 
     public long getPendingDealsCount() {
-        return leadRepository.countByDealStatus("PENDING");
+        return leadRepository
+                .countByDealStatus("PENDING");
     }
 
-    // ===============================
-    // REPORTS
-    // ===============================
+    // =====================================
+    // REPORTS / FILTERS
+    // =====================================
     public List<Lead> getWonLeads() {
-        return leadRepository.findByDealStatus("WON");
+        return leadRepository
+                .findByDealStatus("WON");
     }
 
     public List<Lead> getLostLeads() {
-        return leadRepository.findByDealStatus("LOST");
+        return leadRepository
+                .findByDealStatus("LOST");
+    }
+
+    public List<Lead> getPendingLeads() {
+        return leadRepository
+                .findByDealStatus("PENDING");
     }
 
     public List<Lead> getChatSourceLeads() {
-        return leadRepository.findBySource("CHAT");
+        return leadRepository
+                .findBySource("CHAT");
+    }
+
+    // =====================================
+    // HELPERS
+    // =====================================
+    private boolean isBlank(String v) {
+        return v == null
+                || v.trim().isEmpty();
     }
 }

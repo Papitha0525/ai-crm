@@ -1,52 +1,45 @@
 package com.aicrm.backend.controller;
 
-import com.aicrm.backend.service.ReportService;
+import com.aicrm.backend.service.PdfReportService;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/report")
-@CrossOrigin(origins = "*")
+@CrossOrigin("*")
 public class ReportController {
 
     @Autowired
-    private ReportService reportService;
+    private PdfReportService pdfReportService;
 
-    @PreAuthorize("hasAuthority('ADMIN')")
-    @GetMapping("/leads")
-    public ResponseEntity<byte[]> downloadLeadsReport() {
-        try {
-            byte[] excelFile = reportService.generateLeadsReport();
+    @GetMapping("/pdf")
+    public ResponseEntity<InputStreamResource>
+    downloadPdf() {
 
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION,
-                            "attachment; filename=leads_report.xlsx")
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .body(excelFile);
+        var pdf =
+                pdfReportService
+                .generateLeadReport();
 
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().build();
-        }
-    }
+        HttpHeaders headers =
+                new HttpHeaders();
 
-    @PreAuthorize("hasAuthority('ADMIN')")
-    @GetMapping("/tasks")
-    public ResponseEntity<byte[]> downloadTasksReport() {
-        try {
-            byte[] excelFile = reportService.generateTasksReport();
+        headers.add(
+                "Content-Disposition",
+                "attachment; filename=crm-report.pdf"
+        );
 
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION,
-                            "attachment; filename=tasks_report.xlsx")
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .body(excelFile);
-
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().build();
-        }
+        return ResponseEntity
+                .ok()
+                .headers(headers)
+                .contentType(
+                        MediaType.APPLICATION_PDF)
+                .body(
+                        new InputStreamResource(pdf)
+                );
     }
 }

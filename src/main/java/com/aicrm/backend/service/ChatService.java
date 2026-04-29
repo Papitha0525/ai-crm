@@ -5,13 +5,17 @@ import com.aicrm.backend.dto.ChatResponse;
 import com.aicrm.backend.dto.LeadDto;
 import com.aicrm.backend.model.ChatHistory;
 import com.aicrm.backend.model.Lead;
+import com.aicrm.backend.model.User;
 import com.aicrm.backend.repository.ChatHistoryRepository;
+import com.aicrm.backend.repository.UserRepository;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -22,31 +26,50 @@ public class ChatService {
     private LeadService leadService;
 
     @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
     private ChatHistoryRepository chatHistoryRepository;
 
     @Autowired(required = false)
     private AiOrchestratorService aiService;
 
-    private List<Lead> pendingDeleteList = new ArrayList<>();
+    private List<Lead> pendingDeleteList =
+            new ArrayList<>();
+
     private LeadDto pendingLead = null;
-    private boolean waitingLeadInput = false;
 
-    public ChatResponse processMessage(ChatRequest request) {
+    private boolean waitingLeadInput =
+            false;
+    private boolean waitingSalesmanInput = false;
 
-        String originalMsg = request.getMessage().trim();
-        String msg = originalMsg.toLowerCase(Locale.ROOT).trim();
+    public ChatResponse processMessage(
+            ChatRequest request) {
 
-        String role = getRole(request);
+        String originalMsg =
+                request.getMessage().trim();
+
+        String msg =
+                originalMsg.toLowerCase(
+                        Locale.ROOT).trim();
+
+        String role = request.getRole();
+
+if (role == null) role = "";
+
+role = role.trim().toUpperCase();
+
+boolean isAdmin = role.equals("ADMIN");
 
         ChatResponse response;
 
         try {
 
-            // =====================================
+            // ===============================
             // CANCEL
-            // =====================================
-            if (msg.equals("cancel") || msg.equals("reset")
-                    || msg.equals("stop") || msg.equals("exit")) {
+            // ===============================
+            if (msg.matches(
+                    "^(cancel|reset|stop|exit)$")) {
 
                 waitingLeadInput = false;
                 pendingLead = null;
@@ -59,122 +82,334 @@ public class ChatService {
                 );
             }
 
-            // =====================================
+            // ===============================
             // GREETING
-            // =====================================
-            else if (msg.equals("hi") || msg.equals("hello")
-                    || msg.equals("hey")) {
+            // ===============================
+            else if (msg.matches(
+                    "^(hi|hello|hey|hii)$")) {
 
                 response = new ChatResponse(
                         "👋 Hello " + role + "\n\n"
-                                + "Available commands:\n"
-                                + "• create lead for Ravi 9876543210 ravi@gmail.com Chennai\n"
+                                + "Commands:\n"
+                                + "• create lead Ravi 9876543210 ravi@gmail.com Chennai\n"
                                 + "• show leads\n"
                                 + "• show won deals\n"
-                                + "• show lead Ravi\n"
-                                + "• update #1 phone 9999999999",
+                                + "• reports\n"
+                                + "• assign lead Ravi to Raj",
                         "GREETING",
                         null
                 );
             }
 
-            // =====================================
-            // CONTINUE CREATE LEAD FLOW
-            // =====================================
+            // ===============================
+            // WAITING CREATE FLOW
+            // ===============================
             else if (waitingLeadInput) {
 
-                fillMissingLeadFields(originalMsg);
+                fillMissingLeadFields(
+                        originalMsg);
 
-                String missing = getMissingFields();
+                String missing =
+                        getMissingFields();
 
                 if (!missing.isBlank()) {
 
-                    response = new ChatResponse(
-                            "Please provide:\n\n" + missing,
+                    response =
+                            new ChatResponse(
+                            "Please provide:\n\n"
+                                    + missing,
                             "REQUIRED",
                             null
                     );
 
                 } else {
 
-                    pendingLead.setRequirement("General");
-                    pendingLead.setSource("CHAT");
-                    pendingLead.setDealStatus("PENDING");
-                    pendingLead.setStatus("NEW");
+                    pendingLead.setSource(
+                            "CHAT");
 
-                    Lead lead = leadService.createLead(pendingLead);
+                    pendingLead.setStatus(
+                            "NEW");
 
-                    waitingLeadInput = false;
+                    pendingLead.setDealStatus(
+                            "PENDING");
+
+                    Lead lead =
+                            leadService.createLead(
+                                    pendingLead);
+
+                    waitingLeadInput =
+                            false;
+
                     pendingLead = null;
 
-                    response = new ChatResponse(
-                            "✅ Lead created successfully\n\n"
-                                    + "👤 " + lead.getName()
-                                    + "\n📞 " + lead.getPhone()
-                                    + "\n📧 " + lead.getEmail()
-                                    + "\n🏙 " + lead.getCity(),
+                    response =
+                            new ChatResponse(
+                            "✅ Lead created successfully.\n\n"
+                                    + "👤 "
+                                    + lead.getName(),
                             "CREATED",
                             lead
                     );
                 }
             }
 
-            // =====================================
+            // ===============================
             // CREATE LEAD
-            // =====================================
-            else if (msg.matches(".*create.*lead.*")){
+            // ===============================
+            else if (msg.matches(
+                    ".*(create|add|new).*lead.*")) {
 
                 pendingLead = new LeadDto();
 
-                pendingLead.setName(extractName(originalMsg));
-                pendingLead.setPhone(extractPhone(originalMsg));
-                pendingLead.setEmail(extractEmail(originalMsg));
-                pendingLead.setCity(extractCity(originalMsg));
-                pendingLead.setRequirement(extractRequirement(originalMsg));
+                pendingLead.setName(
+                        extractName(originalMsg));
 
-                String missing = getMissingFields();
+                pendingLead.setPhone(
+                        extractPhone(originalMsg));
+
+                pendingLead.setEmail(
+                        extractEmail(originalMsg));
+
+                pendingLead.setCity(
+                        extractCity(originalMsg));
+
+                pendingLead.setRequirement(
+                        extractRequirement(
+                                originalMsg));
+
+                String missing =
+                        getMissingFields();
 
                 if (!missing.isBlank()) {
 
-                    waitingLeadInput = true;
+                    waitingLeadInput =
+                            true;
 
-                    response = new ChatResponse(
-                            "Need these details:\n\n" + missing,
+                    response =
+                            new ChatResponse(
+                            "Need details:\n\n"
+                                    + missing,
                             "REQUIRED",
                             null
                     );
 
                 } else {
 
-                    if (isBlank(pendingLead.getRequirement())) {
-                        pendingLead.setRequirement("General");
-                    }
+                    pendingLead.setSource(
+                            "CHAT");
 
-                    pendingLead.setSource("CHAT");
-                    pendingLead.setDealStatus("PENDING");
-                    pendingLead.setStatus("NEW");
+                    pendingLead.setStatus(
+                            "NEW");
 
-                    Lead lead = leadService.createLead(pendingLead);
+                    pendingLead.setDealStatus(
+                            "PENDING");
+
+                    Lead lead =
+                            leadService.createLead(
+                                    pendingLead);
 
                     pendingLead = null;
 
-                    response = new ChatResponse(
-                            "✅ Lead created successfully\n\n"
-                                    + "👤 " + lead.getName(),
+                    response =
+                            new ChatResponse(
+                            "✅ Lead created successfully.\n\n👤 "
+                                    + lead.getName(),
                             "CREATED",
                             lead
                     );
                 }
             }
 
-            // =====================================
-            // ADMIN ONLY DELETE
-            // =====================================
-            else if (msg.startsWith("delete")) {
+            // ===============================
+            // ADMIN ADD SALESMAN
+            // ===============================
+            else if (msg.matches(
+                    ".*(allow|add|make|give).*salesman.*")) {
 
                 if (!role.equals("ADMIN")) {
 
-                    response = new ChatResponse(
+                    response =
+                            new ChatResponse(
+                            "❌ Only ADMIN can add salesman.",
+                            "DENIED",
+                            null
+                    );
+
+                } else {
+
+                    response =
+                            promoteSalesman(
+                                    originalMsg);
+                }
+            }
+
+            // ===============================
+            // ADMIN DELETE SALESMAN
+            // ===============================
+            else if (msg.matches(
+                    ".*(delete|remove|revoke).*salesman.*")) {
+
+                if (!role.equals("ADMIN")) {
+
+                    response =
+                            new ChatResponse(
+                            "❌ Only ADMIN can remove salesman.",
+                            "DENIED",
+                            null
+                    );
+
+                } else {
+
+                    response =
+                            removeSalesman(
+                                    originalMsg);
+                }
+            }
+            // ===============================
+            // SALESMAN COUNT
+            // ===============================
+            else if (msg.matches(
+                    ".*(salesman count|how many salesman|total salesman).*")) {
+
+                if (!role.equals("ADMIN")) {
+
+                    response =
+                            new ChatResponse(
+                            "❌ Only ADMIN can view salesman count.",
+                            "DENIED",
+                            null
+                    );
+
+                } else {
+
+                    long count =
+                            userRepository.countByRole(
+                                    "SALESMAN");
+
+                    response =
+                            new ChatResponse(
+                            "👨‍💼 Total Salesman : "
+                                    + count,
+                            "COUNT",
+                            null
+                    );
+                }
+            }
+
+            // ===============================
+            // USER COUNT
+            // ===============================
+            else if (msg.matches(
+                    ".*(user count|how many user|how many users|total user|total users).*")) {
+
+                if (!role.equals("ADMIN")) {
+
+                    response =
+                            new ChatResponse(
+                            "❌ Only ADMIN can view user count.",
+                            "DENIED",
+                            null
+                    );
+
+                } else {
+
+                    long count =
+                            userRepository.countByRole(
+                                    "USER");
+
+                    response =
+                            new ChatResponse(
+                            "👤 Total Users : "
+                                    + count,
+                            "COUNT",
+                            null
+                    );
+                }
+            }
+
+            // ===============================
+            // SALESMAN DETAILS
+            // ===============================
+            else if (msg.matches(
+                    ".*(show salesman|salesman details|show all salesman).*")) {
+
+                if (!role.equals("ADMIN")) {
+
+                    response =
+                            new ChatResponse(
+                            "❌ Only ADMIN can view salesman details.",
+                            "DENIED",
+                            null
+                    );
+
+                } else {
+
+                    response =
+                            showUsersByRole(
+                                    "SALESMAN",
+                                    "👨‍💼 SALESMAN LIST"
+                            );
+                }
+            }
+
+            // ===============================
+            // USER DETAILS
+            // ===============================
+            else if (msg.matches(
+                    ".*(show users|user details|show all users).*")) {
+
+                if (!role.equals("ADMIN")) {
+
+                    response =
+                            new ChatResponse(
+                            "❌ Only ADMIN can view user details.",
+                            "DENIED",
+                            null
+                    );
+
+                } else {
+
+                    response =
+                            showUsersByRole(
+                                    "USER",
+                                    "👤 USER LIST"
+                            );
+                }
+            }
+
+            // ===============================
+            // ASSIGN LEAD
+            // ===============================
+            else if (msg.matches(
+                    ".*assign.*lead.*to.*")) {
+
+                if (!role.equals("ADMIN")) {
+
+                    response =
+                            new ChatResponse(
+                            "❌ Only ADMIN can assign leads.",
+                            "DENIED",
+                            null
+                    );
+
+                } else {
+
+                    response =
+                            assignLeadCommand(
+                                    originalMsg);
+                }
+            }
+
+            // ===============================
+            // DELETE LEAD
+            // ===============================
+            else if (msg.startsWith(
+                    "delete ")) {
+
+                if (!role.equals("ADMIN")) {
+
+                    response =
+                            new ChatResponse(
                             "❌ Only ADMIN can delete leads.",
                             "DENIED",
                             null
@@ -182,12 +417,20 @@ public class ChatService {
 
                 } else {
 
-                    String name = extractDeleteName(originalMsg);
-                    List<Lead> leads = leadService.findAllByName(name);
+                    String name =
+                            extractDeleteName(
+                                    originalMsg);
+
+                    List<Lead> leads =
+                            leadService.findAllByName(
+                                    name);
+
                     if (leads.isEmpty()) {
 
-                        response = new ChatResponse(
-                                "❌ Lead not found : " + name,
+                        response =
+                                new ChatResponse(
+                                "❌ Lead not found : "
+                                        + name,
                                 "NOT_FOUND",
                                 null
                         );
@@ -195,53 +438,67 @@ public class ChatService {
                     } else if (leads.size() == 1) {
 
                         boolean deleted =
-                                leadService.deleteLead(leads.get(0).getId());
+                                leadService.deleteLead(
+                                        leads.get(0).getId());
 
-                        response = new ChatResponse(
+                        response =
+                                new ChatResponse(
                                 deleted
                                         ? "🗑 Lead deleted successfully."
                                         : "❌ Delete failed.",
-                                deleted ? "DELETED" : "FAILED",
+                                deleted
+                                        ? "DELETED"
+                                        : "FAILED",
                                 null
                         );
 
                     } else {
 
-                        pendingDeleteList = leads;
+                        pendingDeleteList =
+                                leads;
 
-                        StringBuilder sb = new StringBuilder();
-                        sb.append("Multiple leads found:\n\n");
+                        StringBuilder sb =
+                                new StringBuilder();
 
-                        for (int i = 0; i < leads.size(); i++) {
-                            Lead l = leads.get(i);
+                        sb.append(
+                                "Multiple leads found:\n\n");
+
+                        for (int i = 0;
+                             i < leads.size();
+                             i++) {
 
                             sb.append(i + 1)
-                                    .append(". ")
-                                    .append(l.getName())
-                                    .append(" - ")
-                                    .append(l.getPhone())
-                                    .append("\n");
+                              .append(". ")
+                              .append(
+                               leads.get(i).getName())
+                              .append(" - ")
+                              .append(
+                               leads.get(i).getPhone())
+                              .append("\n");
                         }
 
-                        sb.append("\nReply with number to delete.");
+                        sb.append(
+                                "\nReply number to delete.");
 
-                        response = new ChatResponse(
+                        response =
+                                new ChatResponse(
                                 sb.toString(),
-                                "MULTIPLE_FOUND",
+                                "MULTIPLE",
                                 null
                         );
                     }
                 }
             }
-
-            // =====================================
-            // DELETE CHOICE
-            // =====================================
-            else if (msg.matches("\\d+") && !pendingDeleteList.isEmpty()) {
+            // ===============================
+            // DELETE SELECTED NUMBER
+            // ===============================
+            else if (msg.matches("\\d+")
+                    && !pendingDeleteList.isEmpty()) {
 
                 if (!role.equals("ADMIN")) {
 
-                    response = new ChatResponse(
+                    response =
+                            new ChatResponse(
                             "❌ Only ADMIN can delete.",
                             "DENIED",
                             null
@@ -249,29 +506,36 @@ public class ChatService {
 
                 } else {
 
-                    int choice = Integer.parseInt(msg);
+                    int no =
+                            Integer.parseInt(msg);
 
-                    if (choice >= 1 && choice <= pendingDeleteList.size()) {
+                    if (no >= 1
+                            && no <= pendingDeleteList.size()) {
 
-                        Lead selected =
-                                pendingDeleteList.get(choice - 1);
+                        Lead lead =
+                                pendingDeleteList.get(no - 1);
 
                         boolean deleted =
-                                leadService.deleteLead(selected.getId());
+                                leadService.deleteLead(
+                                        lead.getId());
 
                         pendingDeleteList.clear();
 
-                        response = new ChatResponse(
+                        response =
+                                new ChatResponse(
                                 deleted
                                         ? "🗑 Lead deleted."
                                         : "❌ Delete failed.",
-                                deleted ? "DELETED" : "FAILED",
+                                deleted
+                                        ? "DELETED"
+                                        : "FAILED",
                                 null
                         );
 
                     } else {
 
-                        response = new ChatResponse(
+                        response =
+                                new ChatResponse(
                                 "❌ Invalid number.",
                                 "INVALID",
                                 null
@@ -280,205 +544,253 @@ public class ChatService {
                 }
             }
 
-            // =====================================
-            // SHOW BY NAME
-            // =====================================
-            else if (msg.startsWith("show lead ")) {
-
-                String name =
-                        originalMsg.substring(10).trim();
-
-                List<Lead> leads =
-                        leadService.findAllByName(name);
-
-                response = buildLeadResponse(leads, role);
-            }
-
-            // =====================================
+            // ===============================
             // SHOW WON DEALS
-            // =====================================
-            else if (msg.contains("show won")) {
+            // ===============================
+            else if (msg.matches(
+                    ".*(show won|won deals|won leads).*")) {
 
                 List<Lead> leads =
                         leadService.getWonLeads();
 
-                response = buildLeadResponse(
-                        filterByRole(leads, request, role),
-                        role
-                );
+                response =
+                        buildLeadResponse(
+                                filterByRole(
+                                        leads,
+                                        request,
+                                        role),
+                                role
+                        );
             }
 
-            // =====================================
+            // ===============================
             // SHOW LOST DEALS
-            // =====================================
-            else if (msg.contains("show lost")) {
+            // ===============================
+            else if (msg.matches(
+                    ".*(show lost|lost deals|lost leads).*")) {
 
                 List<Lead> leads =
                         leadService.getLostLeads();
 
-                response = buildLeadResponse(
-                        filterByRole(leads, request, role),
-                        role
-                );
+                response =
+                        buildLeadResponse(
+                                filterByRole(
+                                        leads,
+                                        request,
+                                        role),
+                                role
+                        );
             }
 
-            // =====================================
+            // ===============================
             // SHOW PENDING DEALS
-            // =====================================
-            else if (msg.contains("show pending")) {
+            // ===============================
+            else if (msg.matches(
+                    ".*(show pending|pending deals).*")) {
 
                 List<Lead> leads =
-                        leadService.getAllLeads();
+                        leadService.getPendingLeads();
 
-                List<Lead> pending = new ArrayList<>();
-
-                for (Lead l : leads) {
-                    if ("PENDING".equalsIgnoreCase(
-                            l.getDealStatus())) {
-                        pending.add(l);
-                    }
-                }
-
-                response = buildLeadResponse(
-                        filterByRole(pending, request, role),
-                        role
-                );
+                response =
+                        buildLeadResponse(
+                                filterByRole(
+                                        leads,
+                                        request,
+                                        role),
+                                role
+                        );
             }
 
-            // =====================================
-            // SHOW LEADS
-            // =====================================
-            else if (msg.equals("show leads")
-                    || msg.equals("list leads")) {
+            // ===============================
+            // SHOW BY NAME
+            // ===============================
+            else if (msg.matches(".*(show|list|display|give).*lead.*")) {
 
-                List<Lead> leads;
+    List<Lead> leads;
 
-                if (role.equals("ADMIN")) {
+    if (role.equals("ADMIN")) {
 
-                    leads = leadService.getAllLeads();
+        leads = leadService.getAllLeads();
 
-                } else if (role.equals("SALESMAN")) {
+    } else if (role.equals("SALESMAN")) {
 
-                    leads = leadService.getAssignedLeads(
-                            request.getUserId()
-                    );
+        leads = leadService.getAssignedLeads(
+                request.getUserId()
+        );
 
-                } else {
+    } else {
 
-                    response = new ChatResponse(
-                            "❌ USER cannot see all leads.",
+        response = new ChatResponse(
+                "❌ USER cannot see all leads.",
+                "DENIED",
+                null
+        );
+
+        saveChatHistory(request, response.getReply());
+        return response;
+    }
+
+    response = buildLeadResponse(leads, role);
+}
+            // ===============================
+            // REPORTS
+            // ===============================
+            else if (msg.matches(
+                    ".*(report|reports|crm report|sales report).*")) {
+
+                if (!role.equals("ADMIN")) {
+
+                    response =
+                            new ChatResponse(
+                            "❌ Only ADMIN can view reports.",
                             "DENIED",
                             null
                     );
 
-                    saveChatHistory(
-                            request,
-                            response.getReply()
-                    );
+                } else {
 
-                    return response;
+                    response =
+                            generateAdminReport();
                 }
+            }
+            // ===============================
+            // UPDATE LEAD (PHONE / EMAIL / CITY)
+            // examples:
+            // update Ravi phone to 9999999999
+            // change lead #2 email test@gmail.com
+            // modify #3 city Chennai
+            // ===============================
+            else if (msg.matches(
+                    ".*(update|change|modify).*")) {
 
-                response = buildLeadResponse(leads, role);
+                response =
+                        handleUpdateCommand(
+                                originalMsg,
+                                request,
+                                role
+                        );
             }
 
-            // =====================================
-            // UPDATE LEAD
-            // =====================================
-            else if (msg.contains("update")
-                    && msg.contains("#")) {
-                Pattern p = Pattern.compile("#(\\d+)");
-                Matcher m = p.matcher(msg);
+            // ===============================
+            // DEAL STATUS UPDATE
+            // examples:
+            // Ravi won
+            // mark Ravi lost
+            // set #2 pending
+            // Raj deal won
+            // ===============================
+            else if (msg.matches(
+                    ".*\\b(won|lost|pending)\\b.*")) {
 
-                if (!m.find()) {
+                response =
+                        handleDealUpdate(
+                                originalMsg,
+                                request,
+                                role
+                        );
+            }
 
-                    response = new ChatResponse(
-                            "Use: update #1 phone 9999999999",
-                            "INVALID",
+            // ===============================
+            // PDF REPORT
+            // ===============================
+            else if (msg.matches(
+                    ".*(pdf|download pdf|export pdf).*report.*")) {
+
+                if (!role.equals("ADMIN")) {
+
+                    response =
+                            new ChatResponse(
+                            "❌ Only ADMIN can download PDF report.",
+                            "DENIED",
                             null
                     );
 
                 } else {
 
-                    int no = Integer.parseInt(m.group(1));
-
-                    List<Lead> leads = role.equals("ADMIN")
-                            ? leadService.getAllLeads()
-                            : leadService.getAssignedLeads(
-                                    request.getUserId());
-
-                    if (no < 1 || no > leads.size()) {
-
-                        response = new ChatResponse(
-                                "❌ Lead not found.",
-                                "NOT_FOUND",
-                                null
-                        );
-
-                    } else {
-
-                        Lead lead = leads.get(no - 1);
-
-                        if (msg.contains("phone")) {
-
-                            String phone =
-                                    extractPhone(originalMsg);
-
-                            leadService.updateFieldById(
-                                    lead.getId(),
-                                    "phone",
-                                    phone
-                            );
-
-                            response = new ChatResponse(
-                                    "✅ Phone updated.",
-                                    "UPDATED",
-                                    null
-                            );
-
-                        } else if (msg.contains("email")) {
-
-                            String email =
-                                    extractEmail(originalMsg);
-
-                            leadService.updateFieldById(
-                                    lead.getId(),
-                                    "email",
-                                    email
-                            );
-
-                            response = new ChatResponse(
-                                    "✅ Email updated.",
-                                    "UPDATED",
-                                    null
-                            );
-
-                        } else {
-
-                            response = new ChatResponse(
-                                    "❌ Unknown field.",
-                                    "INVALID",
-                                    null
-                            );
-                        }
-                    }
+                    response =
+                            new ChatResponse(
+                            "📄 PDF Report Generated Successfully.",
+                            "PDF",
+                            null
+                    );
                 }
             }
 
-            // =====================================
+            // ===============================
             // DEFAULT AI
-            // =====================================
+            // ===============================
+            else if (msg.equals("show salesman") || msg.equals("show salesmen")) {
+
+    if (!role.equals("ADMIN")) {
+
+        response = new ChatResponse(
+                "Only ADMIN can view salesmen.",
+                "DENIED",
+                null
+        );
+
+    } else {
+
+        List<User> users = userRepository.findByRole("SALESMAN");
+
+        if (users.isEmpty()) {
+
+            response = new ChatResponse(
+                    "No records found.",
+                    "EMPTY",
+                    null
+            );
+
+        } else {
+
+            StringBuilder sb = new StringBuilder();
+
+            for (User u : users) {
+                sb.append(u.getEmail()).append("\n");
+            }
+
+            response = new ChatResponse(
+                    sb.toString(),
+                    "SHOW",
+                    null
+            );
+        }
+    }
+}
+
+else if (msg.matches(".*(create|add|new|register|make).*?(salesman|seller|employee).*")) {
+
+    if (!isAdmin) {
+        response = new ChatResponse(
+            "❌ Only ADMIN can create salesman.",
+            "TEXT",
+            null
+        );
+    } else {
+
+        waitingSalesmanInput = true;
+
+        response = new ChatResponse(
+            "👤 Please provide:\nName\nEmail\nPassword",
+            "TEXT",
+            null
+        );
+    }
+}
             else {
 
                 String aiReply =
                         "AI unavailable.";
 
                 if (aiService != null) {
+
                     aiReply =
-                            aiService.askGroq(originalMsg);
+                            aiService.askGroq(
+                                    originalMsg);
                 }
 
-                response = new ChatResponse(
+                response =
+                        new ChatResponse(
                         aiReply,
                         "AI_REPLY",
                         null
@@ -497,7 +809,8 @@ public class ChatService {
             e.printStackTrace();
 
             return new ChatResponse(
-                    "Error : " + e.getMessage(),
+                    "Error : "
+                            + e.getMessage(),
                     "ERROR",
                     null
             );
@@ -505,27 +818,231 @@ public class ChatService {
     }
 
     // =====================================
-    // ROLE
+    // ROLE DETECT
     // =====================================
-    private String getRole(ChatRequest request) {
+    private String getRole(
+            ChatRequest request) {
 
-        if ("1".equals(request.getUserId()))
+        if ("1".equals(
+                request.getUserId()))
             return "ADMIN";
 
-        if ("2".equals(request.getUserId()))
+        if ("2".equals(
+                request.getUserId()))
             return "SALESMAN";
 
         return "USER";
     }
 
     // =====================================
-    // RESPONSE BUILDER
+    // NULL VALUE SAFE
+    // =====================================
+    private String nvl(String v) {
+
+        return v == null
+                ? "-"
+                : v;
+    }
+    // =====================================
+    // SHOW USERS BY ROLE
+    // =====================================
+    private ChatResponse showUsersByRole(
+            String role,
+            String title) {
+
+        List<User> users =
+                userRepository.findByRole(role);
+
+        if (users == null
+                || users.isEmpty()) {
+
+            return new ChatResponse(
+                    "No records found.",
+                    "EMPTY",
+                    null
+            );
+        }
+
+        StringBuilder sb =
+                new StringBuilder();
+
+        sb.append(title)
+          .append("\n\n");
+
+        int i = 1;
+
+        for (User u : users) {
+
+            sb.append("#")
+              .append(i++)
+              .append("\n");
+
+            sb.append("👤 ")
+              .append(nvl(u.getName()))
+              .append("\n");
+
+            sb.append("📧 ")
+              .append(nvl(u.getEmail()))
+              .append("\n");
+
+            sb.append("🛡 ")
+              .append(nvl(u.getRole()))
+              .append("\n");
+
+            sb.append("──────────────\n");
+        }
+
+        return new ChatResponse(
+                sb.toString(),
+                "SHOW",
+                null
+        );
+    }
+
+    // =====================================
+    // PROMOTE SALESMAN
+    // =====================================
+    private ChatResponse promoteSalesman(
+            String text) {
+
+        String email =
+                extractEmail(text);
+
+        Optional<User> optional =
+                userRepository
+                .findByEmailIgnoreCase(
+                        email);
+
+        if (optional.isEmpty()) {
+
+            return new ChatResponse(
+                    "❌ User not found.",
+                    "NOT_FOUND",
+                    null
+            );
+        }
+
+        User user =
+                optional.get();
+
+        user.setRole(
+                "SALESMAN");
+
+        userRepository.save(
+                user);
+
+        return new ChatResponse(
+                "✅ " + email
+                        + " promoted as SALESMAN.",
+                "UPDATED",
+                null
+        );
+    }
+
+    // =====================================
+    // REMOVE SALESMAN
+    // =====================================
+    private ChatResponse removeSalesman(
+            String text) {
+
+        String name =
+                extractLastWord(text);
+
+        Optional<User> optional =
+                userRepository
+                .findByNameIgnoreCase(
+                        name);
+
+        if (optional.isEmpty()) {
+
+            return new ChatResponse(
+                    "❌ Salesman not found.",
+                    "NOT_FOUND",
+                    null
+            );
+        }
+
+        User user =
+                optional.get();
+
+        user.setRole("USER");
+
+        userRepository.save(
+                user);
+
+        return new ChatResponse(
+                "✅ " + user.getName()
+                        + " changed to USER.",
+                "UPDATED",
+                null
+        );
+    }
+
+    // =====================================
+    // ASSIGN LEAD COMMAND
+    // =====================================
+    private ChatResponse assignLeadCommand(
+            String text) {
+
+        boolean ok =
+                leadService
+                .assignLeadToSalesmanName(
+                        text);
+
+        return new ChatResponse(
+                ok
+                        ? "✅ Lead assigned successfully."
+                        : "❌ Assignment failed.",
+                ok
+                        ? "UPDATED"
+                        : "FAILED",
+                null
+        );
+    }
+
+    // =====================================
+    // REPORT
+    // =====================================
+    private ChatResponse generateAdminReport() {
+
+        long total =
+                leadService.getLeadCount();
+
+        long won =
+                leadService.getWonDealsCount();
+
+        long lost =
+                leadService.getLostDealsCount();
+
+        long pending =
+                leadService.getPendingDealsCount();
+
+        String report =
+                "📊 CRM REPORT\n\n"
+                + "👥 Total Leads : "
+                + total + "\n"
+                + "🏆 Won Deals : "
+                + won + "\n"
+                + "❌ Lost Deals : "
+                + lost + "\n"
+                + "🕒 Pending : "
+                + pending;
+
+        return new ChatResponse(
+                report,
+                "REPORT",
+                null
+        );
+    }
+    // =====================================
+    // BUILD LEAD RESPONSE
     // =====================================
     private ChatResponse buildLeadResponse(
             List<Lead> leads,
             String role) {
 
-        if (leads == null || leads.isEmpty()) {
+        if (leads == null
+                || leads.isEmpty()) {
 
             return new ChatResponse(
                     "No leads found.",
@@ -534,7 +1051,8 @@ public class ChatService {
             );
         }
 
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb =
+                new StringBuilder();
 
         sb.append("📋 Leads : ")
           .append(leads.size())
@@ -544,16 +1062,39 @@ public class ChatService {
 
         for (Lead l : leads) {
 
-            sb.append("#").append(i++).append("\n");
-            sb.append("👤 ").append(l.getName()).append("\n");
+            sb.append("#")
+              .append(i++)
+              .append("\n");
 
-            if (!role.equals("USER")) {
-                sb.append("📞 ").append(nvl(l.getPhone())).append("\n");
-                sb.append("📧 ").append(nvl(l.getEmail())).append("\n");
+            sb.append("👤 ")
+              .append(nvl(
+                      l.getName()))
+              .append("\n");
+
+            if (!role.equals(
+                    "USER")) {
+
+                sb.append("📞 ")
+                  .append(nvl(
+                          l.getPhone()))
+                  .append("\n");
+
+                sb.append("📧 ")
+                  .append(nvl(
+                          l.getEmail()))
+                  .append("\n");
             }
 
-            sb.append("🏙 ").append(nvl(l.getCity())).append("\n");
-            sb.append("💼 ").append(nvl(l.getDealStatus())).append("\n");
+            sb.append("🏙 ")
+              .append(nvl(
+                      l.getCity()))
+              .append("\n");
+
+            sb.append("💼 ")
+              .append(nvl(
+                      l.getDealStatus()))
+              .append("\n");
+
             sb.append("──────────────\n");
         }
 
@@ -564,30 +1105,338 @@ public class ChatService {
         );
     }
 
+    // =====================================
+    // FILTER BY ROLE
+    // =====================================
     private List<Lead> filterByRole(
             List<Lead> leads,
             ChatRequest request,
             String role) {
 
-        if (role.equals("ADMIN"))
-            return leads;
+        if (role.equals(
+                "ADMIN")) {
 
-        if (role.equals("SALESMAN"))
-            return leadService.getAssignedLeads(
-                    request.getUserId());
+            return leads;
+        }
+
+        if (role.equals(
+                "SALESMAN")) {
+
+            return leadService
+                    .getAssignedLeads(
+                            request.getUserId());
+        }
 
         return new ArrayList<>();
     }
 
-    private String nvl(String v) {
-        return v == null ? "-" : v;
+    // =====================================
+    // UPDATE COMMAND
+    // =====================================
+    private ChatResponse handleUpdateCommand(
+            String text,
+            ChatRequest request,
+            String role) {
+
+        try {
+
+            List<Lead> leads =
+                    role.equals("ADMIN")
+                    ? leadService.getAllLeads()
+                    : leadService
+                      .getAssignedLeads(
+                              request.getUserId());
+
+            Lead target = null;
+
+            Matcher num =
+                    Pattern.compile(
+                            "#(\\d+)")
+                    .matcher(text);
+
+            if (num.find()) {
+
+                int no =
+                        Integer.parseInt(
+                                num.group(1));
+
+                if (no >= 1
+                        && no <= leads.size()) {
+
+                    target =
+                            leads.get(no - 1);
+                }
+            }
+
+            if (target == null) {
+
+                for (Lead l : leads) {
+
+                    if (text.toLowerCase()
+                            .contains(
+                             l.getName()
+                             .toLowerCase())) {
+
+                        target = l;
+                        break;
+                    }
+                }
+            }
+
+            if (target == null) {
+
+                return new ChatResponse(
+                        "❌ Lead not found.",
+                        "NOT_FOUND",
+                        null
+                );
+            }
+
+            if (text.toLowerCase()
+                    .contains("phone")) {
+
+                String phone =
+                        extractPhone(text);
+
+                leadService.updateFieldById(
+                        target.getId(),
+                        "phone",
+                        phone
+                );
+
+                return new ChatResponse(
+                        "✅ Phone updated.",
+                        "UPDATED",
+                        null
+                );
+            }
+
+            if (text.toLowerCase()
+                    .contains("email")) {
+
+                String email =
+                        extractEmail(text);
+
+                leadService.updateFieldById(
+                        target.getId(),
+                        "email",
+                        email
+                );
+
+                return new ChatResponse(
+                        "✅ Email updated.",
+                        "UPDATED",
+                        null
+                );
+            }
+
+            if (text.toLowerCase()
+                    .contains("city")) {
+
+                String city =
+                        extractCity(text);
+
+                leadService.updateFieldById(
+                        target.getId(),
+                        "city",
+                        city
+                );
+
+                return new ChatResponse(
+                        "✅ City updated.",
+                        "UPDATED",
+                        null
+                );
+            }
+
+            return new ChatResponse(
+                    "❌ Unknown update field.",
+                    "INVALID",
+                    null
+            );
+
+        } catch (Exception e) {
+
+            return new ChatResponse(
+                    "❌ Update failed.",
+                    "ERROR",
+                    null
+            );
+        }
+    }
+    // =====================================
+    // DEAL STATUS UPDATE
+    // Admin only
+    // =====================================
+    private ChatResponse handleDealUpdate(
+            String text,
+            ChatRequest request,
+            String role) {
+
+        if (!role.equals("ADMIN")) {
+
+            return new ChatResponse(
+                    "❌ Only ADMIN can change deal status.",
+                    "DENIED",
+                    null
+            );
+        }
+
+        try {
+
+            List<Lead> leads =
+                    leadService.getAllLeads();
+
+            Lead target = null;
+
+            Matcher m =
+                    Pattern.compile("#(\\d+)")
+                    .matcher(text);
+
+            if (m.find()) {
+
+                int no =
+                        Integer.parseInt(
+                                m.group(1));
+
+                if (no >= 1
+                        && no <= leads.size()) {
+
+                    target =
+                            leads.get(no - 1);
+                }
+            }
+
+            if (target == null) {
+
+                for (Lead l : leads) {
+
+                    if (text.toLowerCase()
+                            .contains(
+                             l.getName()
+                              .toLowerCase())) {
+
+                        target = l;
+                        break;
+                    }
+                }
+            }
+
+            if (target == null) {
+
+                return new ChatResponse(
+                        "❌ Lead not found.",
+                        "NOT_FOUND",
+                        null
+                );
+            }
+
+            String status =
+                    "PENDING";
+
+            String msg =
+                    text.toLowerCase();
+
+            if (msg.contains("won")
+                    || msg.contains("win")) {
+
+                status = "WON";
+
+            } else if (msg.contains("lost")
+                    || msg.contains("loss")) {
+
+                status = "LOST";
+            }
+
+            leadService.updateFieldById(
+                    target.getId(),
+                    "dealStatus",
+                    status
+            );
+
+            return new ChatResponse(
+                    "✅ Deal updated to "
+                            + status,
+                    "UPDATED",
+                    null
+            );
+
+        } catch (Exception e) {
+
+            return new ChatResponse(
+                    "❌ Deal update failed.",
+                    "ERROR",
+                    null
+            );
+        }
     }
 
     // =====================================
+    // EXTRACT HELPERS
+    // =====================================
+    private String extractShowLeadName(
+            String text) {
+
+        return text
+                .replaceAll(
+                 "(?i)show lead|search lead",
+                 "")
+                .trim();
+    }
+
+    private String extractLastWord(
+            String text) {
+
+        String[] arr =
+                text.trim().split("\\s+");
+
+        return arr.length == 0
+                ? ""
+                : arr[arr.length - 1];
+    }
+
+    private String extractDeleteName(
+            String text) {
+
+        return text.replaceFirst(
+                "(?i)delete",
+                ""
+        ).trim();
+    }
+
+    private void saveChatHistory(
+            ChatRequest request,
+            String reply) {
+
+        try {
+
+            ChatHistory h =
+                    new ChatHistory();
+
+            h.setUserId(
+                    Long.parseLong(
+                     request.getUserId()));
+
+            h.setSessionId(
+                    request.getSessionId());
+
+            h.setMessage(
+                    request.getMessage());
+
+            h.setResponse(reply);
+
+            chatHistoryRepository
+                    .save(h);
+
+        } catch (Exception ignored) {
+        }
+    }
+    // =====================================
     // HELPERS
     // =====================================
-    private boolean isBlank(String v) {
-        return v == null || v.trim().isEmpty();
+
+    private boolean isBlank(String text) {
+        return text == null || text.trim().isEmpty();
     }
 
     private String getMissingFields() {
@@ -607,97 +1456,137 @@ public class ChatService {
             sb.append("• City\n");
 
         if (isBlank(pendingLead.getRequirement()))
-        sb.append("• Requirement\n");
+            sb.append("• Requirement\n");
 
         return sb.toString();
     }
 
-    private void fillMissingLeadFields(String t) {
+    private void fillMissingLeadFields(String text) {
 
         if (isBlank(pendingLead.getName()))
-            pendingLead.setName(extractName(t));
+            pendingLead.setName(extractName(text));
 
         if (isBlank(pendingLead.getPhone()))
-            pendingLead.setPhone(extractPhone(t));
+            pendingLead.setPhone(extractPhone(text));
 
         if (isBlank(pendingLead.getEmail()))
-            pendingLead.setEmail(extractEmail(t));
+            pendingLead.setEmail(extractEmail(text));
 
         if (isBlank(pendingLead.getCity()))
-            pendingLead.setCity(extractCity(t));
+            pendingLead.setCity(extractCity(text));
 
         if (isBlank(pendingLead.getRequirement()))
-        pendingLead.setRequirement(t.trim());
+            pendingLead.setRequirement(text.trim());
     }
 
     private String extractName(String text) {
-        Matcher m = Pattern.compile(
-                "(?i)for\\s+([a-zA-Z]+)")
-                .matcher(text);
-        return m.find() ? m.group(1) : "";
-    }
+
+    // Remove command words
+    String cleaned = text
+            .replaceAll("(?i)create", "")
+            .replaceAll("(?i)add", "")
+            .replaceAll("(?i)new", "")
+            .replaceAll("(?i)lead", "")
+            .replaceAll("(?i)for", "")
+            .trim();
+
+    // Remove phone number
+    cleaned = cleaned.replaceAll("\\b\\d{10}\\b", "").trim();
+
+    // Remove email
+    cleaned = cleaned.replaceAll(
+            "[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+",
+            ""
+    ).trim();
+
+    // Remove known city names
+    cleaned = cleaned.replaceAll(
+            "(?i)chennai|salem|madurai|trichy|coimbatore|erode",
+            ""
+    ).trim();
+
+    // Remove extra spaces
+    cleaned = cleaned.replaceAll("\\s+", " ").trim();
+
+    return cleaned;
+}
 
     private String extractPhone(String text) {
+
         Matcher m = Pattern.compile("\\d{10}")
                 .matcher(text);
+
         return m.find() ? m.group() : "";
     }
 
     private String extractEmail(String text) {
+
         Matcher m = Pattern.compile(
                 "[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+")
                 .matcher(text);
+
         return m.find() ? m.group() : "";
     }
 
     private String extractCity(String text) {
 
         String[] cities = {
-                "chennai","madurai","coimbatore",
-                "erode","salem","trichy"
+                "chennai",
+                "madurai",
+                "salem",
+                "coimbatore",
+                "erode",
+                "trichy",
+                "bangalore"
         };
 
-        for (String c : cities) {
-            if (text.toLowerCase().contains(c))
-                return c.substring(0,1).toUpperCase()
-                        + c.substring(1);
+        for (String city : cities) {
+
+            if (text.toLowerCase().contains(city)) {
+
+                return city.substring(0,1)
+                        .toUpperCase()
+                        + city.substring(1);
+            }
         }
 
         return "";
     }
 
     private String extractRequirement(String text) {
-        return "General";
-    }
 
-    private String extractDeleteName(String text) {
-        return text.replaceFirst(
-                "(?i)delete", "").trim();
-    }
+    String lower = text.toLowerCase();
 
-    private void saveChatHistory(
-            ChatRequest request,
-            String reply) {
+    // Look for common keywords first
+    if (lower.contains("website")) return "Website";
+    if (lower.contains("app")) return "Mobile App";
+    if (lower.contains("crm")) return "CRM";
+    if (lower.contains("software")) return "Software";
+    if (lower.contains("erp")) return "ERP";
+    if (lower.contains("billing")) return "Billing Software";
+    if (lower.contains("marketing")) return "Digital Marketing";
 
-        try {
+    // Remove known create lead data
+    String cleaned = text
+            .replaceAll("(?i)create|add|new|lead|for", "")
+            .replaceAll("\\b\\d{10}\\b", "")
+            .replaceAll("[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+", "")
+            .replaceAll("(?i)chennai|salem|madurai|trichy|coimbatore|erode", "")
+            .trim();
 
-            ChatHistory h = new ChatHistory();
+    // If contains extra words after name use as requirement
+    String[] parts = cleaned.split("\\s+");
 
-            h.setUserId(
-                    Long.parseLong(
-                            request.getUserId()));
+    if (parts.length > 2) {
+        StringBuilder req = new StringBuilder();
 
-            h.setSessionId(
-                    request.getSessionId());
-
-            h.setMessage(
-                    request.getMessage());
-
-            h.setResponse(reply);
-
-            chatHistoryRepository.save(h);
-
-        } catch (Exception ignored) {
+        for (int i = 2; i < parts.length; i++) {
+            req.append(parts[i]).append(" ");
         }
+
+        return req.toString().trim();
     }
+
+    return "";
+}
 }

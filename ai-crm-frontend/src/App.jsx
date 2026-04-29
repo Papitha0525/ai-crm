@@ -29,25 +29,39 @@ function Login({ setAuth, setUserRole, isDarkMode, setIsDarkMode }) {
   const navigate = useNavigate();
   const particlesInit = useCallback(async engine => { await loadSlim(engine); }, []);
 
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (username && password) {
-      let role = "customer"; 
-      const lowerUser = username.toLowerCase().trim();
-      
-      if (lowerUser === "admin@gmail.com") {
-        if (password === "admin@123") { role = "admin"; } 
-        else { toast.error("Incorrect Admin Password!"); return; }
-      } else if (lowerUser.includes("sales")) {
-        role = "salesman";
-      }
+ const handleLogin = (e) => {
+  e.preventDefault();
 
-      setUserRole(role);
-      setAuth(true);
-      toast.success('Securely logged in to Workspace!');
-      navigate("/dashboard");
+  if (username && password) {
+    let role = "CUSTOMER";
+    const lowerUser = username.toLowerCase().trim();
+
+    if (lowerUser === "admin@gmail.com") {
+      if (password === "admin@123") {
+        role = "ADMIN";
+      } else {
+        toast.error("Incorrect Admin Password!");
+        return;
+      }
+    } else if (
+      lowerUser.includes("sales") ||
+      lowerUser.includes("kishore") ||
+      lowerUser.includes("seller")
+    ) {
+      role = "SALESMAN";
     }
-  };
+
+    setUserRole(role);
+    setAuth(true);
+
+    localStorage.setItem("auth", "true");
+    localStorage.setItem("role", role);
+
+    toast.success("Securely logged in!");
+
+    navigate("/dashboard");
+  }
+};
 
   const handleSignup = (e) => {
     e.preventDefault();
@@ -245,7 +259,7 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
     setMessages(prev => [...prev, { id: thinkingId, text: "⏳ Processing securely...", type: "bot" }]);
     
     try {
-      const res = await api.post("/chat/message", { message: msg, userId: "1", sessionId: currentSessionId, role: userRole });
+      const res = await api.post("/api/chat/message", { message: msg, userId: "1", sessionId: currentSessionId, role: userRole.toUpperCase() });
       setMessages(prev => prev.filter(m => m.id !== thinkingId)); 
       addBotMessage(res.data.reply);
       if (pendingAction === "assign") triggerImageToast("Lead successfully assigned to pipeline!");
