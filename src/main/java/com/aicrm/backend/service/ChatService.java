@@ -779,24 +779,60 @@ else if (msg.matches(".*(create|add|new|register|make).*?(salesman|seller|employ
 }
             else {
 
-                String aiReply =
-                        "AI unavailable.";
+    // =============================
+    // HANDLE SALESMAN CREATION INPUT
+    // =============================
+    if (waitingSalesmanInput) {
 
-                if (aiService != null) {
+        String[] parts = originalMsg.split(" ");
 
-                    aiReply =
-                            aiService.askGroq(
-                                    originalMsg);
-                }
+        if (parts.length < 3) {
+            response = new ChatResponse(
+                    "❌ Please enter: Name Email Password",
+                    "TEXT",
+                    null
+            );
+        } else {
 
-                response =
-                        new ChatResponse(
-                        aiReply,
-                        "AI_REPLY",
-                        null
-                );
-            }
+            String name = parts[0];
+            String email = parts[1];
+            String password = parts[2];
 
+            User user = new User();
+            user.setName(name);
+            user.setEmail(email);
+            user.setPassword(password);
+            user.setRole("SALESMAN");
+
+            userRepository.save(user);
+
+            waitingSalesmanInput = false;
+
+            response = new ChatResponse(
+                    "✅ Salesman created successfully!",
+                    "CREATED",
+                    null
+            );
+        }
+
+    } else {
+
+        // =============================
+        // AI FALLBACK
+        // =============================
+        String aiReply = "AI disabled";
+
+        if (aiService != null) {
+            aiReply = aiService.askGroq(originalMsg);
+        }
+
+        response = new ChatResponse(
+                aiReply,
+                "AI_REPLY",
+                null
+        );
+    }
+}
             saveChatHistory(
                     request,
                     response.getReply()
