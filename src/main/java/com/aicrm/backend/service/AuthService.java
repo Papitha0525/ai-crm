@@ -7,7 +7,6 @@ import com.aicrm.backend.repository.UserRepository;
 import com.aicrm.backend.security.JwtUtil;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -17,9 +16,6 @@ public class AuthService {
     private UserRepository userRepository;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
     private JwtUtil jwtUtil;
 
     // ===============================
@@ -27,7 +23,6 @@ public class AuthService {
     // ===============================
     public AuthResponse register(AuthRequest request) {
 
-        // Check email exists
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email already exists!");
         }
@@ -36,26 +31,13 @@ public class AuthService {
         user.setName(request.getName());
         user.setEmail(request.getEmail());
 
-        // Encrypt password
-        user.setPassword(
-            passwordEncoder.encode(request.getPassword())
-        );
+        // ✅ Plain password
+        user.setPassword(request.getPassword());
 
-        // Default role USER
-        if (request.getRole() == null ||
-            request.getRole().isBlank()) {
-
-            user.setRole("USER");
-
-        } else {
-            user.setRole(
-                request.getRole().toUpperCase()
-            );
-        }
+       user.setRole("USER");
 
         userRepository.save(user);
 
-        // Generate JWT
         String token = jwtUtil.generateToken(
             user.getEmail(),
             user.getRole()
@@ -80,17 +62,11 @@ public class AuthService {
             new RuntimeException("User not found!")
         );
 
-        // Password verify
-        if (!passwordEncoder.matches(
-                request.getPassword(),
-                user.getPassword()
-        )) {
-            throw new RuntimeException(
-                "Invalid password!"
-            );
+        // ✅ Plain password check
+        if (!request.getPassword().equals(user.getPassword())) {
+            throw new RuntimeException("Invalid password!");
         }
 
-        // Generate token
         String token = jwtUtil.generateToken(
             user.getEmail(),
             user.getRole()

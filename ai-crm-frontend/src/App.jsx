@@ -29,47 +29,83 @@ function Login({ setAuth, setUserRole, isDarkMode, setIsDarkMode }) {
   const navigate = useNavigate();
   const particlesInit = useCallback(async engine => { await loadSlim(engine); }, []);
 
- const handleLogin = (e) => {
+ const handleLogin = async (e) => {
   e.preventDefault();
 
-  if (username && password) {
-    let role = "CUSTOMER";
-    const lowerUser = username.toLowerCase().trim();
+  if (!username || !password) {
+    toast.error("Enter email and password");
+    return;
+  }
 
-    if (lowerUser === "admin@gmail.com") {
-      if (password === "admin@123") {
-        role = "ADMIN";
-      } else {
-        toast.error("Incorrect Admin Password!");
-        return;
-      }
-    } else if (
-      lowerUser.includes("sales") ||
-      lowerUser.includes("kishore") ||
-      lowerUser.includes("seller")
-    ) {
-      role = "SALESMAN";
-    }
+  const lowerUser = username.toLowerCase().trim();
+
+  // 🔥 1. ADMIN LOGIN (HARDCODE)
+  if (lowerUser === "admin@gmail.com" && password === "admin@123") {
+
+    const role = "ADMIN";
+
+    localStorage.setItem("auth", "true");
+    localStorage.setItem("role", role);
+    localStorage.setItem("token", "admin-token"); // dummy
+    localStorage.setItem("userId", "admin@gmail.com");
 
     setUserRole(role);
     setAuth(true);
 
-    localStorage.setItem("auth", "true");
-    localStorage.setItem("role", role);
-
-    toast.success("Securely logged in!");
+    toast.success("Admin login successful");
 
     navigate("/dashboard");
+    return; // 🚨 IMPORTANT (stop here)
+  }
+
+  // 🔥 2. NORMAL LOGIN (DB)
+  try {
+    const res = await api.post("/api/auth/login", {
+      email: username,
+      password: password
+    });
+
+    const role = res.data.role;
+
+    localStorage.setItem("auth", "true");
+    localStorage.setItem("role", role);
+    localStorage.setItem("token", res.data.token);
+    localStorage.setItem("userId", res.data.email);
+
+    setUserRole(role);
+    setAuth(true);
+
+    toast.success("Login successful");
+
+    navigate("/dashboard");
+
+  } catch (err) {
+    toast.error("Invalid email or password");
   }
 };
 
-  const handleSignup = (e) => {
-    e.preventDefault();
-    if (password !== confirmPassword) { toast.error("Passwords do not match!"); return; }
-    localStorage.setItem("isNewUser", "true"); 
-    toast.success(`Premium Account created for ${username}!`);
+  const handleSignup = async (e) => {
+  e.preventDefault();
+
+  if (password !== confirmPassword) {
+    toast.error("Passwords do not match!");
+    return;
+  }
+
+  try {
+    const res = await api.post("/api/auth/register", {
+      name: username,
+      email: email,
+      password: password
+    });
+
+    toast.success("Account created successfully!");
     setView("login");
-  };
+
+  } catch (err) {
+    toast.error("Signup failed");
+  }
+};
 
   const handleForgotPassword = (e) => {
     e.preventDefault();
