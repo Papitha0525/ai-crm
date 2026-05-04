@@ -5,6 +5,7 @@ import com.aicrm.backend.model.Lead;
 import com.aicrm.backend.service.LeadService;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -21,17 +22,31 @@ public class LeadController {
     @Autowired
     private LeadService leadService;
 
-    // CREATE
+    // ✅ ALL LEADS — /api/leads (Frontend default call)
+    @GetMapping
+    public List<Lead> getAllLeadsDefault() {
+        return leadService.getAllLeads();
+    }
+
+    // ✅ ALL LEADS — /api/leads/all
+    @GetMapping("/all")
+    public List<Lead> getAllLeads() {
+        return leadService.getAllLeads();
+    }
+
+    // ✅ CREATE LEAD — POST /api/leads  (called by frontend chat flow)
+    @PreAuthorize("hasAnyAuthority('ADMIN','SALESMAN','USER')")
+    @PostMapping
+    public ResponseEntity<Lead> createLeadFromChat(@RequestBody LeadDto dto) {
+        Lead saved = leadService.createLead(dto);
+        return ResponseEntity.status(201).body(saved);
+    }
+
+    // ✅ CREATE LEAD — POST /api/leads/create  (original endpoint kept)
     @PreAuthorize("hasAnyAuthority('ADMIN','SALESMAN')")
     @PostMapping("/create")
     public Lead createLead(@RequestBody LeadDto dto) {
         return leadService.createLead(dto);
-    }
-
-    // ALL LEADS
-    @GetMapping("/all")
-    public List<Lead> getAllLeads() {
-        return leadService.getAllLeads();
     }
 
     // COUNT
@@ -79,7 +94,6 @@ public class LeadController {
     @PutMapping("/assign/{leadId}/{userId}")
     public String assignLead(@PathVariable Long leadId,
                              @PathVariable Long userId) {
-
         return leadService.assignLead(leadId, userId)
                 ? "Lead assigned successfully"
                 : "Lead or user not found";
@@ -103,24 +117,12 @@ public class LeadController {
     @PreAuthorize("hasAuthority('ADMIN')")
     @GetMapping("/dashboard")
     public Map<String, Long> dashboard() {
-
         Map<String, Long> data = new HashMap<>();
-
-        data.put("totalLeads",
-                leadService.getLeadCount());
-
-        data.put("newLeads",
-                leadService.getNewLeadsCount());
-
-        data.put("wonDeals",
-                leadService.getWonDealsCount());
-
-        data.put("lostDeals",
-                leadService.getLostDealsCount());
-
-        data.put("pendingDeals",
-                leadService.getPendingDealsCount());
-
+        data.put("totalLeads", leadService.getLeadCount());
+        data.put("newLeads", leadService.getNewLeadsCount());
+        data.put("wonDeals", leadService.getWonDealsCount());
+        data.put("lostDeals", leadService.getLostDealsCount());
+        data.put("pendingDeals", leadService.getPendingDealsCount());
         return data;
     }
 }
