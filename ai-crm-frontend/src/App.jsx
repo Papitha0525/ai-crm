@@ -45,6 +45,26 @@ const LEAD_STEPS = [
 ];
 
 // ============================
+// FIELD MAP FOR UPDATE
+// ============================
+const FIELD_MAP = {
+  "phone": "phone",
+  "email": "email",
+  "city": "city",
+  "name": "name",
+  "requirement": "requirement",
+  "status": "status",
+  "dealstatus": "dealStatus",
+  "deal": "dealStatus",
+  "followup": "followUp",
+  "follow": "followUp",
+  "source": "source"
+};
+
+// Fields customer is allowed to update
+const CUSTOMER_ALLOWED_FIELDS = ["name", "requirement", "city", "email", "phone"];
+
+// ============================
 // 1. LOGIN COMPONENT
 // ============================
 function Login({ setAuth, setUserRole, isDarkMode, setIsDarkMode }) {
@@ -67,26 +87,12 @@ function Login({ setAuth, setUserRole, isDarkMode, setIsDarkMode }) {
       toast.error("Enter email and password");
       return;
     }
-    const lowerUser = username.toLowerCase().trim();
-
-    if (lowerUser === "admin@gmail.com" && password === "admin@123") {
-      localStorage.setItem("auth", "true");
-      localStorage.setItem("role", "admin");
-      localStorage.setItem("token", "admin-token");
-      localStorage.setItem("userId", "admin@gmail.com");
-      setUserRole("admin");
-      setAuth(true);
-      toast.success("Admin login successful");
-      navigate("/dashboard");
-      return;
-    }
-
     try {
       const res = await api.post("/api/auth/login", {
         email: username,
         password: password
       });
-      const role = res.data.role?.toLowerCase() || "salesman";
+      const role = res.data.role?.toLowerCase() || "customer";
       localStorage.setItem("auth", "true");
       localStorage.setItem("role", role);
       localStorage.setItem("token", res.data.token);
@@ -276,7 +282,6 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
 
-  // ✅ PERSISTENT activity log — stored separately per role
   const sessionKey = `chatSessions_${userRole?.toLowerCase() || "customer"}`;
   const [chatSessions, setChatSessions] = useState(() =>
     JSON.parse(localStorage.getItem(`chatSessions_${userRole?.toLowerCase() || "customer"}`) || "[]"));
@@ -290,19 +295,10 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
     localStorage.getItem("isNewUser") === "true");
   const [tourStep, setTourStep] = useState(0);
 
-  // ============================
-  // ✅ LEAD CREATION FLOW STATE
-  // ============================
   const [leadFlow, setLeadFlow] = useState({
-    active: false,      // Is a lead creation in progress?
-    step: 0,            // Current step index (0-4)
-    data: {             // Collected lead data
-      name: "",
-      requirement: "",
-      phone: "",
-      email: "",
-      city: ""
-    }
+    active: false,
+    step: 0,
+    data: { name: "", requirement: "", phone: "", email: "", city: "" }
   });
 
   const chatBoxRef = useRef(null);
@@ -357,18 +353,21 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
     if (isAdmin) {
       welcomeText += "👑 <b>ADMINISTRATOR ACCESS</b><br>";
       welcomeText += "Full database control enabled.<br><br>";
-      welcomeText += "➕ <b>Create Lead</b> → <i>create lead</i> (guided step-by-step)<br>";
+      welcomeText += "➕ <b>Create Lead</b> → <i>create lead</i><br>";
       welcomeText += "📋 <b>Show Leads</b> → <i>show leads</i><br>";
       welcomeText += "🗑 <b>Delete</b> → <i>delete Ravi</i><br>";
-      welcomeText += "✏️ <b>Update</b> → <i>update #1 email to new@gmail.com</i><br>";
+      welcomeText += "✏️ <b>Update</b> → <i>update Ravi phone to 9876543210</i><br>";
+      welcomeText += "✏️ <b>Change</b> → <i>change Ravi's phone to 9876543210</i><br>";
       welcomeText += "🏆 <b>Deal Status</b> → <i>Ravi won / Ravi lost</i><br>";
       welcomeText += "📅 <b>Follow Up</b> → <i>follow up call tomorrow for Ravi</i><br>";
       welcomeText += "📊 <b>Download Report</b> → <i>download report</i><br>";
     } else if (isSalesman) {
       welcomeText += "💼 <b>SALESMAN WORKSPACE</b><br>";
       welcomeText += "Manage your pipeline & follow-ups.<br><br>";
-      welcomeText += "➕ <b>Create Lead</b> → <i>create lead</i> (guided step-by-step)<br>";
+      welcomeText += "➕ <b>Create Lead</b> → <i>create lead</i><br>";
       welcomeText += "📋 <b>My Pipeline</b> → <i>show leads</i><br>";
+      welcomeText += "✏️ <b>Update</b> → <i>update Ravi phone to 9876543210</i><br>";
+      welcomeText += "✏️ <b>Change</b> → <i>change Ravi's phone to 9876543210</i><br>";
       welcomeText += "🏆 <b>Update Status</b> → <i>Ravi won</i><br>";
       welcomeText += "📅 <b>Follow Up</b> → <i>follow up call tomorrow for Ravi</i><br>";
       welcomeText += "📊 <b>Report</b> → <i>download report</i><br>";
@@ -377,6 +376,9 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
       welcomeText += "How can we assist you today?<br><br>";
       welcomeText += "➕ <b>New Request</b> → <i>create lead</i><br>";
       welcomeText += "📋 <b>Check Status</b> → <i>show leads</i><br>";
+      welcomeText += "✏️ <b>Update</b> → <i>update Ravi phone to 9876543210</i><br>";
+      welcomeText += "✏️ <b>Change</b> → <i>change Ravi's phone to 9876543210</i><br>";
+      welcomeText += "<br>⚠️ <i>You can update: name, requirement, city, email, phone only.</i><br>";
     }
     welcomeText += "<br>━━━━━━━━━━━━━━━━━━━━<br>";
     welcomeText += "Type your command or use 🎤 voice!";
@@ -406,15 +408,12 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
     }
   }, [isTourActive, tourStep]);
 
-  // ✅ Persist chatSessions to localStorage whenever they change (per role)
   useEffect(() => {
     localStorage.setItem(sessionKey, JSON.stringify(chatSessions));
   }, [chatSessions]);
 
   const addMessage = (text, type) =>
-    setMessages(prev => [...prev, {
-      id: Date.now() + Math.random(), text, type
-    }]);
+    setMessages(prev => [...prev, { id: Date.now() + Math.random(), text, type }]);
 
   const addBotMessage = (text) =>
     addMessage(text.replace(/\n/g, "<br>"), "bot");
@@ -422,14 +421,8 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
   const saveToHistory = (userMsg) => {
     const sessionExists = chatSessions.some(s => s.id === currentSessionId);
     if (!sessionExists) {
-      const titleText = userMsg.length > 25
-        ? userMsg.substring(0, 25) + "..."
-        : userMsg;
-      const newSession = {
-        id: currentSessionId,
-        title: titleText,
-        time: new Date().toLocaleTimeString()
-      };
+      const titleText = userMsg.length > 25 ? userMsg.substring(0, 25) + "..." : userMsg;
+      const newSession = { id: currentSessionId, title: titleText, time: new Date().toLocaleTimeString() };
       const updatedSessions = [newSession, ...chatSessions].slice(0, 15);
       setChatSessions(updatedSessions);
     }
@@ -439,7 +432,6 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
     setCurrentSessionId(Date.now());
     showWelcomeMessage();
     setInputValue("");
-    // Reset any active lead flow
     setLeadFlow({ active: false, step: 0, data: { name: "", requirement: "", phone: "", email: "", city: "" } });
     triggerImageToast('Started a fresh conversation');
     if (window.innerWidth <= 768) setIsMobileMenuOpen(false);
@@ -555,17 +547,15 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
 
       addBotMessage(html);
       triggerImageToast("Database records fetched!");
-
     } catch (e) {
       addBotMessage("❌ Error fetching leads: " + e.message);
     }
   };
 
   // ============================
-  // ✅ SAVE LEAD TO BACKEND — clean JSON only, no fallback
+  // ✅ SAVE LEAD TO BACKEND
   // ============================
   const saveLeadToBackend = async (leadData) => {
-    // Show collected summary
     let summary = `✅ <b>Lead Details Collected!</b><br><br>`;
     summary += `👤 Name          : <b>${leadData.name}</b><br>`;
     summary += `📋 Requirement   : <b>${leadData.requirement}</b><br>`;
@@ -575,7 +565,6 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
     summary += `⏳ Saving to database...`;
     addBotMessage(summary);
 
-    // Build a clean payload — only the exact field values, nothing else
     const payload = {
       name:        leadData.name.trim(),
       requirement: leadData.requirement.trim(),
@@ -596,7 +585,6 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
       );
       triggerImageToast(`Lead for ${payload.name} created!`);
     } catch (err) {
-      // Show clear error — do NOT fall back to chat API (that causes wrong storage)
       const status = err?.response?.status;
       if (status === 401 || status === 403) {
         addBotMessage("❌ <b>Auth error.</b> Please logout and login again.");
@@ -612,35 +600,120 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
   };
 
   // ============================
-  // ✅ LEAD FLOW HANDLER
+  // ✅ UPDATE LEAD — ROLE-BASED
+  // ============================
+  const updateLead = async (msg) => {
+    // Supports: "update <name> <field> to <value>"
+    const match = msg.match(/update\s+(\w+)\s+([\w\s]+?)\s+to\s+(.+)/i);
+    if (!match) {
+      addBotMessage(
+        "⚠️ <b>Format:</b> <code>update [name] [field] to [value]</code><br><br>" +
+        "📌 Examples:<br>" +
+        "• <i>update Ravi phone to 9876543210</i><br>" +
+        "• <i>update Akash deal to WON</i><br>" +
+        "• <i>update Akash requirement to lift</i>"
+      );
+      return;
+    }
+
+    const [, leadName, fieldRaw, newValue] = match;
+    const fieldKey = fieldRaw.trim().toLowerCase().replace(/\s+/g, "");
+    const mappedField = FIELD_MAP[fieldKey] || fieldKey;
+
+    // ✅ Role-based permission check
+    // Admin & Salesman: all fields allowed
+    // Customer: only name, requirement, city, email, phone
+    if (isCustomer && !CUSTOMER_ALLOWED_FIELDS.includes(fieldKey)) {
+      addBotMessage(
+        `🚫 <b>Permission Denied</b><br><br>` +
+        `As a <b>Customer</b>, you can only update:<br>` +
+        `<b>name, requirement, city, email, phone</b><br><br>` +
+        `Contact your admin to update other fields.`
+      );
+      return;
+    }
+
+    addBotMessage(`⏳ Updating <b>${leadName}</b>'s <b>${mappedField}</b> to <b>${newValue.trim()}</b>...`);
+
+    try {
+      // Fetch all leads to find by name (use api so JWT token is sent)
+      const res = await api.get("/api/leads");
+      const data = res.data;
+      const leads = Array.isArray(data) ? data :
+        data.data || data.leads || data.content || [];
+
+      const lead = leads.find(l =>
+        l.name?.toLowerCase() === leadName.toLowerCase()
+      );
+
+      if (!lead) {
+        addBotMessage(
+          `❌ <b>Lead not found:</b> No lead with name <b>${leadName}</b>.<br><br>` +
+          `Type <b>show leads</b> to see all available leads.`
+        );
+        return;
+      }
+
+      // Build updated payload — spread existing, override target field
+      const payload = { ...lead, [mappedField]: newValue.trim() };
+
+      await api.put(`/api/leads/${lead.id}`, payload);
+
+      addBotMessage(
+        `✅ <b>Updated Successfully!</b><br><br>` +
+        `👤 Lead      : <b>${lead.name}</b><br>` +
+        `📝 Field     : <b>${mappedField}</b><br>` +
+        `✏️ New Value  : <b>${newValue.trim()}</b><br><br>` +
+        `Type <b>show leads</b> to verify the change.`
+      );
+      triggerImageToast(`${lead.name}'s ${mappedField} updated!`);
+
+    } catch (err) {
+      const status = err?.response?.status;
+      const errMsg = err?.response?.data?.message || err?.response?.data || err?.message || 'no response';
+
+      console.error("Update error:", status, errMsg);
+
+      if (status === 401 || status === 403) {
+        addBotMessage(`❌ <b>Auth error (${status}).</b> Please logout and login again.<br><br>Token: ${localStorage.getItem('token') ? 'Present ✅' : 'MISSING ❌'}`);
+      } else if (status === 404) {
+        addBotMessage(`❌ <b>Lead not found</b> in the database.`);
+      } else if (status === 400) {
+        addBotMessage(`❌ <b>Bad request:</b> ${errMsg}`);
+      } else if (status === 500) {
+        addBotMessage(`❌ <b>Server error (500):</b> ${errMsg}`);
+      } else {
+        addBotMessage(
+          `❌ <b>Update failed.</b> Status: <b>${status || 'no response'}</b><br>` +
+          `Error: <b>${errMsg}</b><br><br>` +
+          `Check browser Console (F12) for details.`
+        );
+      }
+    }
+  };
+
+  // ============================
+  // ✅ LEAD CREATION FLOW HANDLER
   // ============================
   const handleLeadFlowStep = async (userInput) => {
     const currentStep = LEAD_STEPS[leadFlow.step];
     const trimmedInput = userInput.trim();
 
-    // Collect data for current step
     const updatedData = {
       ...leadFlow.data,
       [currentStep.field]: currentStep.field === "email" && trimmedInput.toLowerCase() === "skip"
-        ? ""
-        : trimmedInput
+        ? "" : trimmedInput
     };
 
-    // Check if this was the last step
     if (leadFlow.step >= LEAD_STEPS.length - 1) {
-      // All steps done — reset flow and save
       setLeadFlow({ active: false, step: 0, data: { name: "", requirement: "", phone: "", email: "", city: "" } });
       await saveLeadToBackend(updatedData);
     } else {
-      // Move to next step
       const nextStep = leadFlow.step + 1;
       setLeadFlow({ active: true, step: nextStep, data: updatedData });
-
-      // Ask the next question
-      const nextQuestion = LEAD_STEPS[nextStep];
       addBotMessage(
         `<b>Step ${nextStep + 1} of ${LEAD_STEPS.length}</b><br><br>` +
-        nextQuestion.question
+        LEAD_STEPS[nextStep].question
       );
     }
   };
@@ -650,11 +723,9 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
   // ============================
   const startLeadCreationFlow = () => {
     setLeadFlow({
-      active: true,
-      step: 0,
+      active: true, step: 0,
       data: { name: "", requirement: "", phone: "", email: "", city: "" }
     });
-
     addBotMessage(
       `🚀 <b>Starting Lead Creation</b><br><br>` +
       `I'll guide you through <b>${LEAD_STEPS.length} steps</b> to capture the lead details.<br>` +
@@ -671,27 +742,21 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
   const handleSendMessage = async () => {
     const msg = inputValue.trim();
     if (msg === "") return;
-
     const lowerMsg = msg.toLowerCase();
 
-    // ──────────────────────────────
-    // If lead flow is active, handle step
-    // ──────────────────────────────
+    // ── Lead flow active ──
     if (leadFlow.active) {
       addMessage(msg, "user");
       saveToHistory(msg);
       setInputValue("");
 
-      // Allow cancel at any step
-      if (lowerMsg === "cancel" || lowerMsg === "stop" || lowerMsg === "exit") {
+      if (["cancel", "stop", "exit"].includes(lowerMsg)) {
         setLeadFlow({ active: false, step: 0, data: { name: "", requirement: "", phone: "", email: "", city: "" } });
         addBotMessage("❌ <b>Lead creation cancelled.</b><br><br>Type <b>create lead</b> to start again.");
         return;
       }
 
-      // Basic validation per step
       if (leadFlow.step === 2) {
-        // Phone validation
         if (!/^\d{7,15}$/.test(msg.replace(/[\s\-+]/g, ""))) {
           addBotMessage("⚠️ Please enter a <b>valid phone number</b> (digits only).<br><br>" + LEAD_STEPS[2].question);
           return;
@@ -699,7 +764,6 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
       }
 
       if (leadFlow.step === 3 && lowerMsg !== "skip") {
-        // Email validation
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(msg)) {
           addBotMessage("⚠️ Please enter a <b>valid email address</b> or type <b>skip</b>.<br><br>" + LEAD_STEPS[3].question);
           return;
@@ -710,45 +774,65 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
       return;
     }
 
-    // ──────────────────────────────
-    // Normal command routing
-    // ──────────────────────────────
+    // ── Download report ──
     if (lowerMsg.includes("download") && lowerMsg.includes("report")) {
-      addMessage(msg, "user");
-      saveToHistory(msg);
-      setInputValue("");
+      addMessage(msg, "user"); saveToHistory(msg); setInputValue("");
       await downloadReport();
       return;
     }
 
-    if (lowerMsg.includes("show leads") || lowerMsg.includes("list leads") ||
-      lowerMsg.includes("show lead")) {
-      addMessage(msg, "user");
-      saveToHistory(msg);
-      setInputValue("");
+    // ── Show leads ──
+    if (lowerMsg.includes("show leads") || lowerMsg.includes("list leads") || lowerMsg.includes("show lead")) {
+      addMessage(msg, "user"); saveToHistory(msg); setInputValue("");
       await fetchDataForRole();
       return;
     }
 
-    // ✅ Detect "create lead" intent — start guided flow
+    // ── Create lead ──
     if (
-      lowerMsg === "create lead" ||
-      lowerMsg === "new lead" ||
-      lowerMsg === "add lead" ||
-      lowerMsg.startsWith("create lead") ||
-      lowerMsg.startsWith("new lead") ||
-      lowerMsg.startsWith("add lead")
+      lowerMsg === "create lead" || lowerMsg === "new lead" || lowerMsg === "add lead" ||
+      lowerMsg.startsWith("create lead") || lowerMsg.startsWith("new lead") || lowerMsg.startsWith("add lead")
     ) {
-      addMessage(msg, "user");
-      saveToHistory(msg);
-      setInputValue("");
+      addMessage(msg, "user"); saveToHistory(msg); setInputValue("");
       startLeadCreationFlow();
       return;
     }
 
-    // ──────────────────────────────
-    // General AI Chat
-    // ──────────────────────────────
+    // ── "Ravi won" / "Ravi lost" shortcut ──
+    const wonLostMatch = msg.match(/^(\w+)\s+(won|lost)$/i);
+    if (wonLostMatch) {
+      addMessage(msg, "user"); saveToHistory(msg); setInputValue("");
+      const [, leadName, result] = wonLostMatch;
+      await updateLead(`update ${leadName} deal to ${result.toUpperCase()}`);
+      return;
+    }
+
+    // ── "update <name> <field> to <value>" ──
+    if (lowerMsg.startsWith("update ")) {
+      addMessage(msg, "user"); saveToHistory(msg); setInputValue("");
+      await updateLead(msg);
+      return;
+    }
+
+    // ── "change <name>'s <field> to <value>" ──
+    const changeMatch = msg.match(/change\s+(\w+)'?s?\s+([\w\s]+?)\s+to\s+(.+)/i);
+    if (changeMatch) {
+      addMessage(msg, "user"); saveToHistory(msg); setInputValue("");
+      const [, name, field, value] = changeMatch;
+      await updateLead(`update ${name} ${field} to ${value}`);
+      return;
+    }
+
+    // ── "replace <name> <field> to <value>" ──
+    const replaceMatch = msg.match(/replace\s+(\w+)\s+([\w\s]+?)\s+to\s+(.+)/i);
+    if (replaceMatch) {
+      addMessage(msg, "user"); saveToHistory(msg); setInputValue("");
+      const [, name, field, value] = replaceMatch;
+      await updateLead(`update ${name} ${field} to ${value}`);
+      return;
+    }
+
+    // ── General AI Chat ──
     addMessage(msg, "user");
     saveToHistory(msg);
     setInputValue("");
@@ -759,9 +843,7 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
     else if (lowerMsg.includes("won") || lowerMsg.includes("completed")) pendingAction = "complete";
 
     const thinkingId = Date.now() + Math.random();
-    setMessages(prev => [...prev, {
-      id: thinkingId, text: "⏳ Processing...", type: "bot"
-    }]);
+    setMessages(prev => [...prev, { id: thinkingId, text: "⏳ Processing...", type: "bot" }]);
 
     try {
       const res = await api.post("/api/chat/message", {
@@ -776,7 +858,6 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
       if (pendingAction === "assign") triggerImageToast("Lead assigned to pipeline!");
       else if (pendingAction === "delete") triggerImageToast("Lead cleared from system!");
       else if (pendingAction === "complete") triggerImageToast("Deal closed! Great job!");
-
     } catch (error) {
       setMessages(prev => prev.filter(m => m.id !== thinkingId));
       addBotMessage("❌ Server not responding. Check connection.");
@@ -788,10 +869,7 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
   // ============================
   const startVoice = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      toast.error("Use Chrome for voice!");
-      return;
-    }
+    if (!SpeechRecognition) { toast.error("Use Chrome for voice!"); return; }
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then(() => {
         const recognition = new SpeechRecognition();
@@ -814,16 +892,14 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
   };
 
   // ============================
-  // ✅ LOGOUT — role-specific sessions auto-persist
+  // ✅ LOGOUT
   // ============================
   const handleLogout = () => {
-    // Only remove auth data — role-specific chatSessions keys are untouched
     localStorage.removeItem("auth");
     localStorage.removeItem("role");
     localStorage.removeItem("token");
     localStorage.removeItem("userId");
     localStorage.removeItem("isNewUser");
-
     triggerImageToast('Successfully logged out');
     setAuth(false);
   };
@@ -868,8 +944,7 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
             style={{ border: 'none', background: 'transparent', color: 'var(--text-main)' }}>
             <SunMoon size={22} />
           </button>
-          <button className="menu-toggle-btn"
-            onClick={() => setIsMobileMenuOpen(true)}>
+          <button className="menu-toggle-btn" onClick={() => setIsMobileMenuOpen(true)}>
             <Menu size={26} />
           </button>
         </div>
@@ -916,9 +991,7 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
               display: 'flex', justifyContent: 'space-between',
               alignItems: 'center', marginBottom: '12px'
             }}>
-              <p className="section-label" style={{ marginBottom: 0 }}>
-                ACTIVITY LOG
-              </p>
+              <p className="section-label" style={{ marginBottom: 0 }}>ACTIVITY LOG</p>
               <button
                 className={`new-chat-btn ${isTourActive && tourStep === 0 ? 'tour-target-glow' : ''}`}
                 onClick={handleNewChat} title="Start New Chat">
@@ -954,24 +1027,20 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
           <button className="util-btn active">
             <MessageSquare size={16} /> Chat Assistant
           </button>
-
           <button className="util-btn" onClick={fetchDataForRole}>
             <FileText size={16} /> Show Leads
           </button>
-
           {isAdmin && (
             <button className="util-btn" onClick={downloadReport}>
               <Download size={16} /> Download Report
             </button>
           )}
-
           {isAdmin && (
             <button className="util-btn"
               onClick={() => { setShowModal(true); setIsMobileMenuOpen(false); }}>
               <Eraser size={16} /> Clear System Chat
             </button>
           )}
-
           <button className="util-btn"
             onClick={handleLogout}
             style={{ marginTop: '10px', color: '#ff4757' }}>
@@ -980,8 +1049,7 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
         </div>
       </div>
 
-      <div className="main"
-        style={{ zIndex: isTourActive && tourStep === 1 ? 9991 : '' }}>
+      <div className="main" style={{ zIndex: isTourActive && tourStep === 1 ? 9991 : '' }}>
         <div id="chat-box" ref={chatBoxRef}>
           <AnimatePresence>
             {messages.map((msg) => (
@@ -996,7 +1064,6 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
         </div>
 
         <div className="input-container">
-          {/* ✅ Lead flow step indicator above input */}
           <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column' }}>
             {renderLeadFlowIndicator()}
           </div>
@@ -1037,55 +1104,34 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
             exit={{ opacity: 0, scale: 0.9 }}
             key={`tour-${tourStep}`}
             transition={{ duration: 0.3 }}>
-            <div style={{
-              display: 'flex', alignItems: 'center',
-              gap: '10px', marginBottom: '12px'
-            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
               <div style={{
                 background: 'rgba(255,140,0,0.1)', color: 'var(--primary)',
                 padding: '8px', borderRadius: '10px', display: 'flex'
               }}>
-                {tourStep === 0 ? <Plus size={20} /> :
-                  tourStep === 1 ? <MessageSquare size={20} /> :
-                    <Rocket size={20} />}
+                {tourStep === 0 ? <Plus size={20} /> : tourStep === 1 ? <MessageSquare size={20} /> : <Rocket size={20} />}
               </div>
-              <h3 style={{
-                fontSize: '16px', margin: 0,
-                fontFamily: "'Syne', sans-serif", fontWeight: 700
-              }}>
+              <h3 style={{ fontSize: '16px', margin: 0, fontFamily: "'Syne', sans-serif", fontWeight: 700 }}>
                 {tourData[tourStep].title}
               </h3>
             </div>
-            <p style={{
-              fontSize: '13.5px', color: 'var(--text-dim)',
-              marginBottom: '20px', lineHeight: '1.5'
-            }}>
+            <p style={{ fontSize: '13.5px', color: 'var(--text-dim)', marginBottom: '20px', lineHeight: '1.5' }}>
               {tourData[tourStep].desc}
             </p>
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-            }}>
-              <span style={{
-                fontSize: '11px', color: 'var(--text-muted)',
-                fontWeight: 'bold', letterSpacing: '1px'
-              }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold', letterSpacing: '1px' }}>
                 STEP {tourStep + 1} OF 3
               </span>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button onClick={finishTour}
-                  style={{
-                    background: 'transparent', border: 'none',
-                    color: 'var(--text-dim)', cursor: 'pointer',
-                    fontSize: '13px', fontWeight: 600
-                  }}>
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
                   Skip
                 </button>
                 <button onClick={handleTourNext}
                   style={{
-                    background: 'var(--primary-grad)', border: 'none',
-                    color: 'white', padding: '8px 16px', borderRadius: '8px',
-                    cursor: 'pointer', fontSize: '13.5px', fontWeight: 'bold',
-                    boxShadow: '0 4px 10px rgba(255,140,0,0.3)'
+                    background: 'var(--primary-grad)', border: 'none', color: 'white',
+                    padding: '8px 16px', borderRadius: '8px', cursor: 'pointer',
+                    fontSize: '13.5px', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(255,140,0,0.3)'
                   }}>
                   {tourStep === 2 ? 'Done' : 'Next'}
                 </button>
@@ -1096,21 +1142,17 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
 
         {showModal && isAdmin && (
           <motion.div className="modal-overlay"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             style={{ display: 'flex', zIndex: 9999 }}>
             <motion.div className="modal-card"
               initial={{ opacity: 0, scale: 0.88 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.88 }}
               transition={{ duration: 0.25, ease: [0.34, 1.56, 0.64, 1] }}>
-              <Trash2 size={35} color="#ff4757"
-                style={{ margin: '0 auto 15px', display: 'block' }} />
+              <Trash2 size={35} color="#ff4757" style={{ margin: '0 auto 15px', display: 'block' }} />
               <h3>Wipe Chat History?</h3>
               <div className="modal-actions">
-                <button className="btn-cancel" onClick={() => setShowModal(false)}>
-                  Cancel
-                </button>
+                <button className="btn-cancel" onClick={() => setShowModal(false)}>Cancel</button>
                 <button className="btn-confirm" onClick={() => {
                   showWelcomeMessage();
                   setShowModal(false);
@@ -1125,29 +1167,21 @@ function Dashboard({ setAuth, userRole, isDarkMode, setIsDarkMode }) {
 
         {itemToDelete && (
           <motion.div className="modal-overlay"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             style={{ display: 'flex', zIndex: 9999 }}>
             <motion.div className="modal-card"
               initial={{ opacity: 0, scale: 0.88 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.88 }}
               transition={{ duration: 0.25, ease: [0.34, 1.56, 0.64, 1] }}>
-              <Trash2 size={35} color="#ff4757"
-                style={{ margin: '0 auto 15px', display: 'block' }} />
+              <Trash2 size={35} color="#ff4757" style={{ margin: '0 auto 15px', display: 'block' }} />
               <h3>Delete this history?</h3>
-              <p style={{
-                color: 'var(--text-dim)', fontSize: '13.5px', margin: '6px 0 0'
-              }}>
+              <p style={{ color: 'var(--text-dim)', fontSize: '13.5px', margin: '6px 0 0' }}>
                 This action cannot be undone.
               </p>
               <div className="modal-actions">
-                <button className="btn-cancel" onClick={() => setItemToDelete(null)}>
-                  Cancel
-                </button>
-                <button className="btn-confirm" onClick={confirmDeleteHistoryItem}>
-                  Delete
-                </button>
+                <button className="btn-cancel" onClick={() => setItemToDelete(null)}>Cancel</button>
+                <button className="btn-confirm" onClick={confirmDeleteHistoryItem}>Delete</button>
               </div>
             </motion.div>
           </motion.div>
@@ -1185,17 +1219,13 @@ export default function App() {
         <Routes>
           <Route path="/login"
             element={!isAuthenticated
-              ? <Login setAuth={setIsAuthenticated}
-                setUserRole={setUserRole}
-                isDarkMode={isDarkMode}
-                setIsDarkMode={setIsDarkMode} />
+              ? <Login setAuth={setIsAuthenticated} setUserRole={setUserRole}
+                  isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
               : <Navigate to="/dashboard" />} />
           <Route path="/dashboard"
             element={isAuthenticated
-              ? <Dashboard setAuth={setIsAuthenticated}
-                userRole={userRole}
-                isDarkMode={isDarkMode}
-                setIsDarkMode={setIsDarkMode} />
+              ? <Dashboard setAuth={setIsAuthenticated} userRole={userRole}
+                  isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
               : <Navigate to="/login" />} />
           <Route path="*"
             element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />

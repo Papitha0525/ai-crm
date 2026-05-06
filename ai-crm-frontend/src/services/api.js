@@ -7,14 +7,18 @@ const api = axios.create({
     }
 });
 
-// JWT token add பண்ணு
-api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token');
-    if (token && token !== 'admin-token') {
-        config.headers.Authorization = 
-            `Bearer ${token}`;
+// ✅ Always attach JWT token — no conditions
+api.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
     }
-    return config;
-});
+);
 
 export default api;

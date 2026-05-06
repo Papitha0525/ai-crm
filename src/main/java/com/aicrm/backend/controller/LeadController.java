@@ -82,7 +82,7 @@ public class LeadController {
     }
 
     // UPDATE
-    @PreAuthorize("hasAnyAuthority('ADMIN','SALESMAN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','SALESMAN','USER')")
     @PutMapping("/{id}")
     public Lead updateLead(@PathVariable Long id,
                            @RequestBody LeadDto dto) {
