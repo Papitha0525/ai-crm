@@ -34,7 +34,10 @@ public class AuthService {
         // ✅ Plain password
         user.setPassword(request.getPassword());
 
-       user.setRole("USER");
+       String role = (request.getRole() != null && !request.getRole().isEmpty())
+    ? request.getRole().toUpperCase()
+    : "USER";
+user.setRole(role);
 
         userRepository.save(user);
 

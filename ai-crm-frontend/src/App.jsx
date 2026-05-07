@@ -113,17 +113,19 @@ function Login({ setAuth, setUserRole, isDarkMode, setIsDarkMode }) {
       return;
     }
     try {
-      await api.post("/api/auth/register", {
-        name: username,
-        email: email,
-        password: password
-      });
-      toast.success("Account created successfully!");
-      setView("login");
-    } catch (err) {
-      toast.error("Signup failed");
-    }
-  };
+    await api.post("/api/auth/register", {
+      name: username,
+      email: email,
+      password: password,
+      role: "USER"  // ✅ explicitly send role
+    });
+    toast.success("Account created! Please login.");
+    setView("login");
+  } catch (err) {
+    const msg = err?.response?.data?.message || err?.response?.data || "Signup failed";
+    toast.error(String(msg));
+  }
+};
 
   const formVariants = {
     hidden: { opacity: 0, x: -20 },
